@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Minecraft данные (версии, ассеты, либы — это сотни мегабайт, в гит не лезем)
+.minecraft/
+game_data/
+
+# IDE
+.vscode/
+.idea/
+
+# Прочее
+*.log
+config.json
+versions_cache.json

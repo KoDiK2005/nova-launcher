@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOVA Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green:  #2ff5a8;
+    --green2: #15d8c4;
+    --purple: #7e62ff;
+    --cyan:   #22d3ee;
+    --bg:     #06070a;
+    --text:   #e9ecf2;
+    --muted:  #8b929d;
+    --muted2: #aeb4be;
+    --panel:  rgba(9,11,15,0.62);
+    --border: rgba(255,255,255,0.07);
+    --glass:  rgba(255,255,255,0.04);
+    --ok:     #2ff5a8;
+    --err:    #ff5c6c;
+  }
+
+  body {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 520px at 72% -12%, rgba(47,245,170,0.10), transparent 60%),
+      radial-gradient(760px 560px at 102% 108%, rgba(126,98,255,0.10), transparent 60%),
+      radial-gradient(700px 480px at -8% 30%, rgba(34,211,238,0.06), transparent 60%);
+  }
+
+  /* ======= SIDEBAR ======= */
+  aside {
+    width: 248px;
+    flex: none;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-right: 1px solid var(--border);
+    padding: 22px 16px;
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 4px 8px 22px 8px;
+  }
+  .logo-diamond {
+    width: 30px; height: 30px;
+    flex: none;
+    transform: rotate(45deg);
+    border-radius: 8px;
+    background: linear-gradient(135deg, #34f5a0, #19d3c6);
+    box-shadow: 0 0 18px rgba(47,245,170,0.45);
+  }
+  .logo-text {
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: 0.22em;
+    color: #f4f7fa;
+  }
+
+  nav { display: flex; flex-direction: column; gap: 6px; }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    color: var(--muted2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    transition: background .12s, color .12s;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-btn.active {
+    background: rgba(47,245,168,0.10);
+    color: var(--green);
+  }
+  .nav-btn.active svg { stroke: var(--green); }
+
+  .section-label {
+    margin: 26px 0 8px;
+    padding: 0 10px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: #5a626f;
+  }
+
+  .game-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(47,245,168,0.07);
+    border: 1px solid rgba(47,245,168,0.15);
+    cursor: default;
+  }
+  .game-icon {
+    width: 34px; height: 34px;
+    flex: none;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: #04140d;
+    background: linear-gradient(135deg, #34f5a0, #13b6c6);
+  }
+  .game-info { display: flex; flex-direction: column; line-height: 1.25; }
+  .game-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .game-status { font-size: 11px; color: var(--green); }
+
+  .user-row {
+    margin-top: auto;
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px;
+    border-radius: 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+  }
+  .user-avatar {
+    width: 36px; height: 36px;
+    flex: none; border-radius: 50%;
+    background: linear-gradient(135deg, var(--green), var(--purple));
+  }
+  .user-info { display: flex; flex-direction: column; line-height: 1.3; }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-online {
+    font-size: 11px;
+    color: var(--green);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+  }
+
+  /* ======= MAIN ======= */
+  main {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 32px;
+    background: linear-gradient(180deg, rgba(6,7,10,0.92), rgba(6,7,10,0.4));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .search-box {
+    display: flex; align-items: center; gap: 10px;
+    flex: 1; max-width: 380px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+  }
+  .search-box input {
+    flex: 1; border: none; background: transparent; outline: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+
+  .header-tag {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 13px;
+    border-radius: 10px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 13px; font-weight: 600;
+    color: var(--muted2);
+    letter-spacing: 0.06em;
+  }
+  .header-tag span.badge {
+    font-size: 11px;
+    color: var(--green);
+    background: rgba(47,245,168,0.12);
+    padding: 2px 8px; border-radius: 5px;
+  }
+
+  /* ======= CONTENT ======= */
+  .content { padding: 6px 32px 40px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    border-radius: 22px;
+    overflow: hidden;
+    min-height: 460px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: #0b0e14;
+    background-image:
+      radial-gradient(700px 420px at 78% 20%, rgba(47,245,170,0.18), transparent 62%),
+      radial-gradient(620px 520px at 20% 90%, rgba(126,98,255,0.20), transparent 60%),
+      repeating-linear-gradient(125deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 22px);
+  }
+  .hero-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 25%, rgba(6,7,10,0.5) 65%, rgba(6,7,10,0.93));
+  }
+  .hero-deco {
+    position: absolute; top: 28px; right: 36px;
+    display: grid; grid-template-columns: repeat(8,20px); gap: 3px;
+    opacity: 0.16;
+  }
+  .px { width: 20px; height: 20px; border-radius: 3px; }
+
+  .hero-inner {
+    position: relative;
+    padding: 36px 44px 38px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+
+  .badge-row { display: flex; align-items: center; gap: 10px; }
+  .badge {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.22em;
+    color: #04140d;
+    background: var(--green);
+    padding: 5px 11px; border-radius: 6px;
+    box-shadow: 0 0 18px rgba(47,245,170,0.4);
+  }
+  .genre { font-size: 13px; color: var(--muted2); letter-spacing: 0.06em; }
+
+  .hero-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700; font-size: 56px;
+    line-height: 0.96; letter-spacing: 0.01em;
+    color: #f6f9fc;
+    text-shadow: 0 4px 40px rgba(0,0,0,0.5);
+  }
+  .hero-title .accent {
+    color: var(--green);
+    text-shadow: 0 0 32px rgba(47,245,170,0.5);
+  }
+  .hero-desc {
+    max-width: 500px; font-size: 14px; line-height: 1.6; color: #b9bfca;
+  }
+
+  .hero-controls {
+    display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap;
+  }
+
+  @keyframes novaPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(47,245,170,0.5), 0 8px 32px rgba(47,245,170,0.28); }
+    50%       { box-shadow: 0 0 0 10px rgba(47,245,170,0), 0 8px 32px rgba(47,245,170,0.28); }
+  }
+  .play-btn {
+    display: flex; align-items: center; gap: 14px;
+    padding: 17px 48px;
+    border: none; border-radius: 14px; cursor: pointer;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700; font-size: 20px; letter-spacing: 0.14em;
+    color: #03140c;
+    background: linear-gradient(120deg, #3dffaa, #15d8c4);
+    animation: novaPulse 3s ease-in-out infinite;
+    transition: transform .16s, filter .16s, opacity .15s;
+  }
+  .play-btn:hover:not(:disabled) { transform: translateY(-3px) scale(1.025); filter: brightness(1.08); }
+  .play-btn:active:not(:disabled) { transform: translateY(0) scale(0.99); }
+  .play-btn:disabled { opacity: 0.55; cursor: default; animation: none; }
+
+  .play-details {
+    display: flex; flex-direction: column; gap: 12px;
+    min-width: 320px; flex: 1; max-width: 460px;
+  }
+  .play-meta {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+
+  select, .nick-input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    border-radius: 9px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color .15s, background .15s;
+  }
+  select { cursor: pointer; }
+  select:hover, .nick-input:hover { background: rgba(255,255,255,0.08); }
+  select:focus, .nick-input:focus { border-color: var(--green); }
+  select option { background: #0c1016; color: var(--text); }
+
+  .nick-wrap { display: flex; align-items: center; gap: 8px; }
+  .nick-label {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px; letter-spacing: 0.16em; color: var(--muted);
+    white-space: nowrap;
+  }
+  .nick-input { width: 140px; }
+
+  .bar-wrap {
+    height: 6px; background: rgba(255,255,255,0.07);
+    border-radius: 6px; overflow: hidden;
+    display: none;
+  }
+  .bar-fill {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--green2), var(--green));
+    border-radius: 6px;
+    transition: width .15s;
+  }
+  .status-text {
+    font-size: 13px; color: var(--muted); min-height: 18px;
+  }
+  .status-text.ok  { color: var(--ok); }
+  .status-text.err { color: var(--err); }
+
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .info-card {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: rgba(14,17,24,0.6);
+    padding: 20px 22px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .info-card-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px; letter-spacing: 0.2em; color: var(--muted);
+  }
+  .info-card-value {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 22px; font-weight: 700; color: var(--green);
+  }
+  .info-card-sub { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside>
+  <div class="logo-row">
+    <div class="logo-diamond"></div>
+    <div class="logo-text">NOVA</div>
+  </div>
+
+  <nav>
+    <button class="nav-btn active">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+      Home
+    </button>
+    <button class="nav-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Settings
+    </button>
+  </nav>
+
+  <div class="section-label">INSTALLED</div>
+
+  <div class="game-item">
+    <div class="game-icon">MC</div>
+    <div class="game-info">
+      <span class="game-name">Minecraft</span>
+      <span class="game-status" id="sideStatus">offline-mode</span>
+    </div>
+  </div>
+
+  <div class="user-row">
+    <div class="user-avatar"></div>
+    <div class="user-info">
+      <span class="user-name" id="sideNick">Mark</span>
+      <span class="user-online"><span class="dot"></span>offline</span>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main>
+  <header>
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a8290" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Поиск версий…" id="searchInput" autocomplete="off">
+    </div>
+    <div class="header-tag">
+      NOVA LAUNCHER
+      <span class="badge">OFFLINE</span>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-deco" id="heroDeco"></div>
+      <div class="hero-overlay"></div>
+
+      <div class="hero-inner">
+        <div class="badge-row">
+          <span class="badge">FEATURED</span>
+          <span class="genre">Survival · Sandbox · Mojang</span>
+        </div>
+
+        <div>
+          <h1 class="hero-title">MINE<span class="accent">CRAFT</span></h1>
+          <p class="hero-desc">Строй, выживай, исследуй. Offline-режим — без аккаунта, ник стабилен между сессиями.</p>
+        </div>
+
+        <div class="hero-controls">
+          <button class="play-btn" id="playBtn" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            ЗАГРУЗКА...
+          </button>
+
+          <div class="play-details">
+            <div class="play-meta">
+              <div class="nick-wrap">
+                <span class="nick-label">НИК</span>
+                <input class="nick-input" id="username" type="text" value="Mark" maxlength="16" placeholder="Mark" autocomplete="off">
+              </div>
+              <select id="version"><option>...</option></select>
+            </div>
+
+            <div class="bar-wrap" id="barWrap">
+              <i class="bar-fill" id="barFill"></i>
+            </div>
+            <div class="status-text" id="status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- карточки -->
+    <div class="cards-row">
+      <div class="info-card">
+        <div class="info-card-title">РЕЖИМ</div>
+        <div class="info-card-value">OFFLINE</div>
+        <div class="info-card-sub">Без Microsoft аккаунта</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-title">ВЕРСИЯ</div>
+        <div class="info-card-value" id="cardVersion">—</div>
+        <div class="info-card-sub">Выбранная версия игры</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-title">СТАТУС</div>
+        <div class="info-card-value" id="cardStatus" style="font-size:16px;color:var(--muted2)">WAITING</div>
+        <div class="info-card-sub" id="cardSub">Ожидание запуска</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let maxProgress = 0;
+
+  // пиксели-декор в углу hero
+  (function() {
+    const colors = ['#2ff5a8','#15d8c4','#7e62ff','#22d3ee','#34f5a0',
+                    'transparent','transparent','transparent','transparent'];
+    const deco = $('heroDeco');
+    for (let i = 0; i < 48; i++) {
+      const px = document.createElement('div');
+      px.className = 'px';
+      px.style.background = colors[Math.floor(Math.random() * colors.length)];
+      deco.appendChild(px);
+    }
+  })();
+
+  // ник синхронизируем в sidebar
+  $('username').addEventListener('input', () => {
+    $('sideNick').textContent = $('username').value || 'Mark';
+  });
+
+  // поиск фильтрует версии
+  $('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    Array.from($('version').options).forEach(o => {
+      o.hidden = q && !o.value.toLowerCase().includes(q);
+    });
+  });
+
+  // версия в карточке
+  $('version').addEventListener('change', () => {
+    $('cardVersion').textContent = $('version').value || '—';
+  });
+
+  // --- колбэки от Python ---
+  function onStatus(text) {
+    setStatus(text);
+    showBar(true);
+    $('cardStatus').textContent = 'DOWNLOADING';
+    $('cardStatus').style.color = 'var(--green)';
+    $('cardSub').textContent = text;
+    $('sideStatus').textContent = 'скачиваю...';
+  }
+  function onMax(value)   { maxProgress = value || 0; }
+  function onProgress(value) {
+    if (maxProgress > 0)
+      $('barFill').style.width = Math.min(100, (value / maxProgress) * 100) + '%';
+  }
+  function onLaunched() {
+    setStatus('Игра запущена. Приятной игры!', 'ok');
+    $('barFill').style.width = '100%';
+    $('cardStatus').textContent = 'UP TO DATE';
+    $('cardStatus').style.color = 'var(--green)';
+    $('cardSub').textContent = 'Запущена';
+    $('sideStatus').textContent = 'играем 🎮';
+    resetButton();
+  }
+  function onError(msg) {
+    setStatus('Ошибка: ' + msg, 'err');
+    $('cardStatus').textContent = 'ERROR';
+    $('cardStatus').style.color = 'var(--err)';
+    $('cardSub').textContent = msg.slice(0, 40);
+    $('sideStatus').textContent = 'ошибка';
+    showBar(false);
+    resetButton();
+  }
+
+  function setStatus(text, cls) {
+    const s = $('status');
+    s.textContent = text;
+    s.className = 'status-text ' + (cls || '');
+  }
+  function showBar(v) { $('barWrap').style.display = v ? 'block' : 'none'; }
+  function resetButton() {
+    const b = $('playBtn');
+    b.disabled = false;
+    b.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> ИГРАТЬ`;
+  }
+
+  async function play() {
+    const username = $('username').value.trim();
+    const version  = $('version').value;
+    if (!username) { setStatus('Введи ник', 'err'); return; }
+
+    const b = $('playBtn');
+    b.disabled = true;
+    b.innerHTML = '...';
+    setStatus(''); showBar(false);
+    $('barFill').style.width = '0%';
+    $('cardStatus').textContent = 'STARTING';
+    $('cardStatus').style.color = 'var(--muted2)';
+
+    try {
+      const res = await window.pywebview.api.play(version, username);
+      if (!res.ok) onError(res.error || 'не удалось запустить');
+    } catch(e) { onError(String(e)); }
+  }
+
+  async function init() {
+    try {
+      const data = await window.pywebview.api.list_versions();
+      const sel = $('version');
+      sel.innerHTML = '';
+      data.versions.forEach(v => {
+        const o = document.createElement('option');
+        o.value = o.textContent = v;
+        sel.appendChild(o);
+      });
+
+      // восстанавливаем сохранённый ник
+      if (data.saved_username) {
+        $('username').value = data.saved_username;
+        $('sideNick').textContent = data.saved_username;
+      }
+      // восстанавливаем сохранённую версию
+      if (data.saved_version) {
+        const opt = Array.from(sel.options).find(o => o.value === data.saved_version);
+        if (opt) sel.value = data.saved_version;
+      }
+
+      $('cardVersion').textContent = sel.value;
+      resetButton();
+      $('playBtn').addEventListener('click', play);
+      $('cardStatus').textContent = 'READY';
+      $('cardStatus').style.color = 'var(--green)';
+      $('cardSub').textContent = 'Готов к запуску';
+    } catch(e) {
+      setStatus('Не удалось получить версии: ' + e, 'err');
+    }
+  }
+  window.addEventListener('pywebviewready', init);
+</script>
+</body>
+</html>
