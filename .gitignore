@@ -16,3 +16,4 @@ game_data/
 *.log
 config.json
 versions_cache.json
+HANDOFF.md

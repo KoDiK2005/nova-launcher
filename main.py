@@ -26,7 +26,7 @@ def main() -> None:
     )
     # Даём Api ссылку на окно, чтобы он мог слать прогресс обратно в JS.
     api.window = window
-    webview.start(gui="edgechromium")
+    webview.start()
 
 
 if __name__ == "__main__":
