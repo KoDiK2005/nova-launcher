@@ -7,6 +7,7 @@ import webview
 
 from . import minecraft
 from . import server_manager
+from . import upnp
 
 ROOT        = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
@@ -24,6 +25,7 @@ DEFAULTS = {
     "width":          854,
     "height":         480,
     "servers":        [],
+    "friends":        [],   # [{name, ip, port}]
     "java_path":      "java",
     "jvm_extra":      "",
     "server_version": "",
@@ -103,6 +105,7 @@ class Api:
             "saved_width":     cfg["width"],
             "saved_height":    cfg["height"],
             "saved_servers":   cfg["servers"],
+            "saved_friends":   cfg["friends"],
             "saved_java":      cfg["java_path"],
             "saved_jvm_extra": cfg["jvm_extra"],
             "saved_srv_ver":   cfg["server_version"],
@@ -324,8 +327,50 @@ class Api:
 
     def stop_server(self):
         server_manager.stop()
+        upnp.close_port(25565)
         return {"ok": True}
 
     def server_command(self, cmd: str):
         server_manager.send_command(cmd)
         return {"ok": True}
+
+    # ─── UPnP / хостинг ───────────────────────────────────────────────────────
+
+    def open_port_upnp(self, port: int = 25565):
+        """Пробрасывает порт через UPnP, возвращает внешний IP."""
+        try:
+            ext_ip, method = upnp.open_port(int(port))
+            return {"ok": True, "ip": ext_ip, "method": method}
+        except Exception as e:
+            return {"ok": False, "error": str(e), "ip": "", "method": "manual"}
+
+    def close_port_upnp(self, port: int = 25565):
+        upnp.close_port(int(port))
+        return {"ok": True}
+
+    # ─── Друзья ───────────────────────────────────────────────────────────────
+
+    def add_friend(self, name: str, ip: str, port: int = 25565):
+        cfg = _load_config()
+        # не дублируем по IP
+        if any(f["ip"] == ip for f in cfg["friends"]):
+            return {"ok": False, "error": "Уже в списке", "friends": cfg["friends"]}
+        cfg["friends"].append({"name": name, "ip": ip, "port": int(port)})
+        _save_config(cfg)
+        return {"ok": True, "friends": cfg["friends"]}
+
+    def remove_friend(self, index: int):
+        cfg = _load_config()
+        if 0 <= index < len(cfg["friends"]):
+            cfg["friends"].pop(index)
+            _save_config(cfg)
+        return {"ok": True, "friends": _load_config()["friends"]}
+
+    def update_friend_ip(self, index: int, ip: str, port: int = 25565):
+        """Обновляет IP друга (когда тот стал хостить)."""
+        cfg = _load_config()
+        if 0 <= index < len(cfg["friends"]):
+            cfg["friends"][index]["ip"]   = ip
+            cfg["friends"][index]["port"] = int(port)
+            _save_config(cfg)
+        return {"ok": True, "friends": _load_config()["friends"]}

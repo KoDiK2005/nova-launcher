@@ -514,6 +514,37 @@
   .btn-save-settings:hover { filter: brightness(1.1); }
   .setting-hint { font-size: 11px; color: var(--muted); margin-top: -8px; }
 
+  /* ── Friends ── */
+  .friend-item {
+    display:flex; align-items:center; gap:10px;
+    background: rgba(255,255,255,0.04); border-radius:10px; padding:10px 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .friend-avatar {
+    width:34px; height:34px; border-radius:50%; flex:none;
+    background: linear-gradient(135deg, var(--green), var(--purple));
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Chakra Petch',sans-serif; font-size:13px; font-weight:700; color:#06070a;
+  }
+  .friend-info { display:flex; flex-direction:column; flex:1; gap:2px; }
+  .friend-name { font-size:13px; font-weight:600; color:var(--text); }
+  .friend-addr { font-size:11px; color:var(--muted); }
+  .friend-online { font-size:10px; color:var(--green); }
+  .btn-friend-connect {
+    font-family:'Chakra Petch',sans-serif; font-size:10px; font-weight:700;
+    padding:5px 12px; border:none; border-radius:7px;
+    background:var(--green); color:#06070a; cursor:pointer; transition:filter .15s;
+    white-space:nowrap;
+  }
+  .btn-friend-connect:hover { filter:brightness(1.1); }
+  .btn-friend-del {
+    font-size:11px; padding:5px 9px; border-radius:7px;
+    background:rgba(255,80,80,.12); color:#ff6b6b;
+    border:1px solid rgba(255,80,80,.25); cursor:pointer;
+    font-family:'Chakra Petch',sans-serif; transition:background .15s;
+  }
+  .btn-friend-del:hover { background:rgba(255,80,80,.28); }
+
   /* ── Multiplayer page ── */
   .mp-page { padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px; }
   .mp-page-title {
@@ -826,56 +857,83 @@
   <div class="mp-page">
     <div>
       <div class="mp-page-title">Мультиплеер</div>
-      <div style="font-size:13px;color:var(--muted);margin-top:4px">Играй с друзьями без Microsoft аккаунта</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px">P2P игра с друзьями без Microsoft и сторонних сервисов</div>
     </div>
 
-    <!-- Локальный IP -->
+    <!-- Хостинг / UPnP -->
     <div class="mp-card">
-      <div class="mp-card-title">🌐 Твой локальный IP</div>
-      <div class="ip-display" id="localIp">загрузка...</div>
-      <div class="ip-hint">Дай этот IP друзьям в той же сети. Порт: <b>25565</b> (по умолчанию).</div>
-      <div class="ip-hint" style="color:var(--muted)">Не в одной сети? Используй <b>ngrok</b> или <b>playit.gg</b> для игры через интернет.</div>
-    </div>
-
-    <!-- Сервер -->
-    <div class="mp-card">
-      <div class="mp-card-title">🖥 Minecraft сервер</div>
-
-      <div class="server-controls">
-        <select class="setting-input" id="srvVersion" style="max-width:140px"></select>
-        <select class="setting-input" id="srvRam" style="max-width:120px">
-          <option value="512">512 MB</option>
-          <option value="1024" selected>1 GB</option>
-          <option value="2048">2 GB</option>
-          <option value="4096">4 GB</option>
-        </select>
-        <div class="srv-status-dot" id="srvDot"></div>
-        <span class="srv-status-txt" id="srvStatusTxt">Остановлен</span>
+      <div class="mp-card-title">🚀 Хостить игру (P2P)</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">ВЕРСИЯ</span>
+          <select class="setting-input" id="srvVersion" style="max-width:140px"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">RAM</span>
+          <select class="setting-input" id="srvRam" style="max-width:110px">
+            <option value="512">512 MB</option>
+            <option value="1024" selected>1 GB</option>
+            <option value="2048">2 GB</option>
+            <option value="4096">4 GB</option>
+          </select>
+        </div>
+        <button class="btn-srv-start" id="btnSrvStart" onclick="hostGame()">▶ ХОСТИТЬ</button>
+        <button class="btn-srv-stop"  id="btnSrvStop"  onclick="stopHosting()" disabled>■ СТОП</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="srv-status-dot" id="srvDot"></div>
+          <span class="srv-status-txt" id="srvStatusTxt">Остановлен</span>
+        </div>
       </div>
 
-      <div class="server-controls">
-        <button class="btn-srv-start" id="btnSrvStart" onclick="startServer()">▶ ЗАПУСТИТЬ</button>
-        <button class="btn-srv-stop"  id="btnSrvStop"  onclick="stopServer()" disabled>■ ОСТАНОВИТЬ</button>
+      <!-- Внешний IP (показывается при хостинге) -->
+      <div id="hostingInfo" style="display:none;padding:14px;background:rgba(47,245,168,.06);border:1px solid rgba(47,245,168,.2);border-radius:12px">
+        <div style="font-size:11px;color:var(--green);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em;margin-bottom:6px">ВНЕШНИЙ IP ДЛЯ ДРУЗЕЙ</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="ip-display" id="extIp" style="font-size:24px">—</span>
+          <span style="font-size:13px;color:var(--muted)">порт <b style="color:var(--text)">25565</b></span>
+          <span id="upnpBadge" style="font-size:11px;padding:3px 10px;border-radius:6px;font-family:'Chakra Petch',sans-serif"></span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px" id="hostingHint"></div>
       </div>
 
       <div class="srv-log" id="srvLog"></div>
-
       <div class="srv-cmd-row">
-        <input class="srv-cmd-input" id="srvCmd" placeholder="команда серверу (say, op, kick...)" 
+        <input class="srv-cmd-input" id="srvCmd" placeholder="команда серверу (say, op, kick...)"
                onkeydown="if(event.key==='Enter') sendCmd()">
-        <button class="btn-cmd-send" onclick="sendCmd()">&gt; ОТПРАВИТЬ</button>
+        <button class="btn-cmd-send" onclick="sendCmd()">▶ ОТПРАВИТЬ</button>
       </div>
     </div>
 
-    <!-- Как подключиться -->
+    <!-- Список друзей -->
     <div class="mp-card">
-      <div class="mp-card-title">📖 Как подключиться другу</div>
-      <div style="font-size:13px;color:var(--muted2);line-height:1.7">
-        1. Друг запускает лаунчер → выбирает ту же версию → жмёт <b style="color:var(--green)">ИГРАТЬ</b><br>
-        2. В игре: <b>Мультиплеер</b> → <b>Добавить сервер</b> → вводит твой IP<br>
-        3. <span style="color:var(--muted)">Важно: сервер должен быть запущен, а <code style="color:var(--green)">online-mode=false</code> уже выставлен автоматически</span>
+      <div class="mp-card-title">👥 Друзья</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="setting-input" id="friendName" placeholder="Имя друга" style="max-width:140px">
+        <input class="setting-input" id="friendIp"   placeholder="IP адрес" style="max-width:180px">
+        <input class="setting-input" id="friendPort" type="number" value="25565" style="max-width:90px">
+        <button class="btn-srv-start" style="padding:8px 18px;font-size:11px" onclick="addFriend()">＋ ДОБАВИТЬ</button>
+      </div>
+      <div id="friendList" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
+      <div id="friendEmpty" style="font-size:13px;color:var(--muted);text-align:center;padding:12px 0">
+        Пока нет друзей — добавь выше 👆
       </div>
     </div>
+
+    <!-- Локальная сеть -->
+    <div class="mp-card">
+      <div class="mp-card-title">🌐 Локальная сеть (LAN)</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">ТВОЙ LAN IP</div>
+          <div class="ip-display" id="localIp" style="font-size:22px">—</div>
+        </div>
+        <div style="font-size:13px;color:var(--muted2);line-height:1.7">
+          Друзья в одной Wi-Fi сети подключаются напрямую по этому IP.<br>
+          <span style="color:var(--muted)">Порт: <b style="color:var(--text)">25565</b></span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1090,6 +1148,7 @@
       if (data.saved_width)   { $('resW').value = data.saved_width;   $('stgW').value = data.saved_width; }
       if (data.saved_height)  { $('resH').value = data.saved_height;  $('stgH').value = data.saved_height; }
       if (data.saved_servers) renderServers(data.saved_servers);
+      if (data.saved_friends) renderFriends(data.saved_friends);
       if (data.saved_java)        $('stgJava').value = data.saved_java;
       if (data.saved_jvm_extra !== undefined) $('stgJvmExtra').value = data.saved_jvm_extra;
 
@@ -1173,17 +1232,45 @@
     } catch(e) { $('localIp').textContent = '127.0.0.1'; }
   }
 
-  async function startServer() {
+  async function hostGame() {
     const ver = $('srvVersion').value;
     const ram = parseInt($('srvRam').value);
-    if (!ver) return;
+    if (!ver) { srvLog('❌ Выбери версию'); return; }
     srvLog('▶ Запускаю сервер ' + ver + '...');
+    $('btnSrvStart').disabled = true;
     await window.pywebview.api.start_server(ver, ram);
+    // Пробуем UPnP
+    srvLog('🔌 Пробрасываю порт через UPnP...');
+    const upnpRes = await window.pywebview.api.open_port_upnp(25565);
+    if (upnpRes.ok && upnpRes.ip) {
+      $('extIp').textContent = upnpRes.ip + ':25565';
+      $('hostingInfo').style.display = 'block';
+      if (upnpRes.method === 'upnp') {
+        $('upnpBadge').textContent = '✅ UPnP';
+        $('upnpBadge').style.cssText = 'background:rgba(47,245,168,.15);color:var(--green);font-size:11px;padding:3px 10px;border-radius:6px;font-family:Chakra Petch,sans-serif';
+        $('hostingHint').textContent = 'Порт открыт автоматически. Друзья могут подключаться!';
+        srvLog('✅ UPnP: порт 25565 открыт. Внешний IP: ' + upnpRes.ip);
+      } else {
+        $('upnpBadge').textContent = '⚠ Ручной проброс';
+        $('upnpBadge').style.cssText = 'background:rgba(255,200,0,.1);color:#ffd700;font-size:11px;padding:3px 10px;border-radius:6px;font-family:Chakra Petch,sans-serif';
+        $('hostingHint').textContent = 'UPnP не сработал — пробрось порт 25565 вручную в настройках роутера.';
+        srvLog('⚠ UPnP не работает. Внешний IP: ' + upnpRes.ip + ' — пробрось порт 25565 вручную');
+      }
+    } else {
+      srvLog('⚠ Не удалось получить внешний IP');
+    }
   }
 
-  async function stopServer() {
+  async function stopHosting() {
     await window.pywebview.api.stop_server();
+    await window.pywebview.api.close_port_upnp(25565);
+    $('hostingInfo').style.display = 'none';
+    $('extIp').textContent = '—';
   }
+
+  // обратная совместимость (если вдруг вызывается)
+  async function startServer() { await hostGame(); }
+  async function stopServer()  { await stopHosting(); }
 
   async function sendCmd() {
     const cmd = $('srvCmd').value.trim();
@@ -1199,6 +1286,52 @@
     log.appendChild(el);
     log.scrollTop = log.scrollHeight;
     while (log.children.length > 300) log.removeChild(log.firstChild);
+  }
+
+  // ─── Друзья ───
+  async function addFriend() {
+    const name = $('friendName').value.trim();
+    const ip   = $('friendIp').value.trim();
+    const port = parseInt($('friendPort').value) || 25565;
+    if (!name || !ip) { return; }
+    const res = await window.pywebview.api.add_friend(name, ip, port);
+    if (res.ok) {
+      $('friendName').value = '';
+      $('friendIp').value   = '';
+      renderFriends(res.friends);
+    } else {
+      alert(res.error || 'Ошибка');
+    }
+  }
+
+  async function removeFriend(idx) {
+    const res = await window.pywebview.api.remove_friend(idx);
+    renderFriends(res.friends);
+  }
+
+  function renderFriends(friends) {
+    const list  = $('friendList');
+    const empty = $('friendEmpty');
+    list.innerHTML = '';
+    if (!friends || friends.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    friends.forEach((f, i) => {
+      const initials = f.name.slice(0, 2).toUpperCase();
+      const el = document.createElement('div');
+      el.className = 'friend-item';
+      el.innerHTML = `
+        <div class="friend-avatar">${initials}</div>
+        <div class="friend-info">
+          <span class="friend-name">${f.name}</span>
+          <span class="friend-addr">${f.ip}:${f.port}</span>
+        </div>
+        <button class="btn-friend-connect" onclick="play('${f.ip}', ${f.port})">▶ ИГРАТЬ</button>
+        <button class="btn-friend-del" onclick="removeFriend(${i})">✕</button>`;
+      list.appendChild(el);
+    });
   }
 
   function onServerLog(line)  { srvLog(line); }
