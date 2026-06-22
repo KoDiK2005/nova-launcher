@@ -1187,7 +1187,7 @@
 
       $('cardVersion').textContent = sel.value;
       resetButton();
-      $('playBtn').addEventListener('click', play);
+      $('playBtn').addEventListener('click', () => play());
       $('cardStatus').textContent = 'READY';
       $('cardStatus').style.color = 'var(--green)';
       $('cardSub').textContent = 'Готов к запуску';

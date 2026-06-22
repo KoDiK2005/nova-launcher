@@ -102,8 +102,9 @@ def sync_servers_dat(servers: list) -> None:
     root  = bytes([9]) + _nbt_str("servers") + list_payload
     root += b"\x00"  # TAG_End
 
-    # Полный NBT: TAG_Compound (10) с пустым именем
-    nbt = bytes([10]) + _nbt_str("") + root
+    # Полный NBT: TAG_Compound (10) с пустым именем — стандартный формат файлов Java Edition.
+    # Nameless формат (0A без 0000) — только для сетевого протокола 1.20.2+, не для файлов.
+    nbt = bytes([10]) + b'\x00\x00' + root
 
     os.makedirs(GAME_DIR, exist_ok=True)
     with gzip.open(os.path.join(GAME_DIR, "servers.dat"), "wb") as f:
@@ -137,6 +138,22 @@ def _build_options(username, uuid_str, token, ram_mb, width, height,
     return opts
 
 
+def _log_launch(command: list) -> None:
+    """Пишем команду запуска в лог для отладки."""
+    import datetime
+    log_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "launch_debug.log")
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(f"Launch time: {datetime.datetime.now()}\n")
+        f.write(f"GAME_DIR: {GAME_DIR}\n")
+        f.write("Command:\n")
+        for arg in command:
+            f.write(f"  {arg}\n")
+        # Ищем --gameDir
+        for i, arg in enumerate(command):
+            if arg == "--gameDir" and i + 1 < len(command):
+                f.write(f"\n--gameDir = {command[i+1]}\n")
+
+
 def launch_offline(version_id: str, username: str,
                    ram_mb=2048, width=854, height=480,
                    server=None, port=None,
@@ -144,6 +161,16 @@ def launch_offline(version_id: str, username: str,
     opts    = _build_options(username, _offline_uuid(username), "",
                              ram_mb, width, height, server, port, java_path, extra_jvm)
     command = mll.command.get_minecraft_command(version_id, GAME_DIR, opts)
+    _log_launch(command)
+    # Ищем не-строки в команде
+    for _i, _a in enumerate(command):
+        if not isinstance(_a, str):
+            import datetime
+            _dbg = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cmd_debug.log")
+            with open(_dbg, "w", encoding="utf-8") as _f:
+                _f.write(f"Non-str at [{_i}]: type={type(_a).__name__} val={repr(_a)}\n")
+                _f.write(f"Prev: {command[_i-1] if _i > 0 else 'N/A'}\n")
+                _f.write(f"Next: {command[_i+1] if _i+1 < len(command) else 'N/A'}\n")
     return subprocess.Popen(command)
 
 

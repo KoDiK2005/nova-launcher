@@ -53,17 +53,24 @@ def _save_config(data: dict):
 
 
 def _get_versions_cached():
+    FALLBACK = ["1.21.4", "1.21.1", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.17.1", "1.16.5"]
     try:
         versions = [v["id"] for v in minecraft.get_versions()]
-        with open(VCACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump(versions, f)
-        return versions
+        if versions:
+            with open(VCACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump(versions, f)
+            return versions
     except Exception:
-        try:
-            with open(VCACHE_PATH, encoding="utf-8") as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return ["1.21.1", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.17.1", "1.16.5"]
+        pass
+    # Сеть упала или список пустой — читаем кэш
+    try:
+        with open(VCACHE_PATH, encoding="utf-8") as f:
+            cached = json.load(f)
+            if cached:
+                return cached
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return FALLBACK
 
 
 def _load_auth():
@@ -313,6 +320,12 @@ class Api:
             srv  = server if server else None
             prt  = int(port) if server and port else None
 
+            # Записываем servers.dat прямо перед запуском (на случай если go_online не успел)
+            try:
+                minecraft.sync_servers_dat(_load_config()["servers"])
+            except Exception:
+                pass
+
             if use_ms:
                 auth = _load_auth()
                 if not auth:
@@ -348,6 +361,13 @@ class Api:
             ).start()
 
         except Exception as e:
+            import traceback, os as _os
+            try:
+                _dbg = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "play_error.log")
+                with open(_dbg, "w", encoding="utf-8") as _f:
+                    _f.write(traceback.format_exc())
+            except Exception:
+                pass
             self._emit("onError", str(e))
 
     # --- Мультиплеер-сервер ---------------------------------------------------

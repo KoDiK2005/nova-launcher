@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOVA Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green:  #2ff5a8;
+    --green2: #15d8c4;
+    --purple: #7e62ff;
+    --cyan:   #22d3ee;
+    --bg:     #06070a;
+    --text:   #e9ecf2;
+    --muted:  #8b929d;
+    --muted2: #aeb4be;
+    --panel:  rgba(9,11,15,0.62);
+    --border: rgba(255,255,255,0.07);
+    --glass:  rgba(255,255,255,0.04);
+    --ok:     #2ff5a8;
+    --err:    #ff5c6c;
+  }
+
+  body {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 520px at 72% -12%, rgba(47,245,170,0.10), transparent 60%),
+      radial-gradient(760px 560px at 102% 108%, rgba(126,98,255,0.10), transparent 60%),
+      radial-gradient(700px 480px at -8% 30%, rgba(34,211,238,0.06), transparent 60%);
+  }
+
+  /* ======= SIDEBAR ======= */
+  aside {
+    width: 248px;
+    flex: none;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-right: 1px solid var(--border);
+    padding: 22px 16px;
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 4px 8px 22px 8px;
+  }
+  .logo-diamond {
+    width: 30px; height: 30px;
+    flex: none;
+    transform: rotate(45deg);
+    border-radius: 8px;
+    background: linear-gradient(135deg, #34f5a0, #19d3c6);
+    box-shadow: 0 0 18px rgba(47,245,170,0.45);
+  }
+  .logo-text {
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: 0.22em;
+    color: #f4f7fa;
+  }
+
+  nav { display: flex; flex-direction: column; gap: 6px; }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    color: var(--muted2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    transition: background .12s, color .12s;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-btn.active {
+    background: rgba(47,245,168,0.10);
+    color: var(--green);
+  }
+  .nav-btn.active svg { stroke: var(--green); }
+
+  .section-label {
+    margin: 26px 0 8px;
+    padding: 0 10px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: #5a626f;
+  }
+
+  .game-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(47,245,168,0.07);
+    border: 1px solid rgba(47,245,168,0.15);
+    cursor: default;
+  }
+  .game-icon {
+    width: 34px; height: 34px;
+    flex: none;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: #04140d;
+    background: linear-gradient(135deg, #34f5a0, #13b6c6);
+  }
+  .game-info { display: flex; flex-direction: column; line-height: 1.25; }
+  .game-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .game-status { font-size: 11px; color: var(--green); }
+
+  .user-row {
+    margin-top: auto;
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px;
+    border-radius: 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+  }
+  .user-avatar {
+    width: 36px; height: 36px;
+    flex: none; border-radius: 50%;
+    background: linear-gradient(135deg, var(--green), var(--purple));
+  }
+  .user-info { display: flex; flex-direction: column; line-height: 1.3; }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-online {
+    font-size: 11px;
+    color: var(--green);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+  }
+
+  /* ======= MAIN ======= */
+  main {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 32px;
+    background: linear-gradient(180deg, rgba(6,7,10,0.92), rgba(6,7,10,0.4));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .search-box {
+    display: flex; align-items: center; gap: 10px;
+    flex: 1; max-width: 380px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+  }
+  .search-box input {
+    flex: 1; border: none; background: transparent; outline: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+
+  .header-tag {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 13px;
+    border-radius: 10px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 13px; font-weight: 600;
+    color: var(--muted2);
+    letter-spacing: 0.06em;
+  }
+  .header-tag span.badge {
+    font-size: 11px;
+    color: var(--green);
+    background: rgba(47,245,168,0.12);
+    padding: 2px 8px; border-radius: 5px;
+  }
+
+  /* ======= CONTENT ======= */
+  .content { padding: 6px 32px 40px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    border-radius: 22px;
+    overflow: hidden;
+    min-height: 460px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: #0b0e14;
+    background-image:
+      radial-gradient(700px 420px at 78% 20%, rgba(47,245,170,0.18), transparent 62%),
+      radial-gradient(620px 520px at 20% 90%, rgba(126,98,255,0.20), transparent 60%),
+      repeating-linear-gradient(125deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 22px);
+  }
+  .hero-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 25%, rgba(6,7,10,0.5) 65%, rgba(6,7,10,0.93));
+  }
+  .hero-deco {
+    position: absolute; top: 28px; right: 36px;
+    display: grid; grid-template-columns: repeat(8,20px); gap: 3px;
+    opacity: 0.16;
+  }
+  .px { width: 20px; height: 20px; border-radius: 3px; }
+
+  .hero-inner {
+    position: relative;
+    padding: 36px 44px 38px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+
+  .badge-row { display: flex; align-items: center; gap: 10px; }
+  .badge {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.22em;
+    color: #04140d;
+    background: var(--green);
+    padding: 5px 11px; border-radius: 6px;
+    box-shadow: 0 0 18px rgba(47,245,170,0.4);
+  }
+  .genre { font-size: 13px; color: var(--muted2); letter-spacing: 0.06em; }
+
+  .hero-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700; font-size: 56px;
+    line-height: 0.96; letter-spacing: 0.01em;
+    color: #f6f9fc;
+    text-shadow: 0 4px 40px rgba(0,0,0,0.5);
+  }
+  .hero-title .accent {
+    color: var(--green);
+    text-shadow: 0 0 32px rgba(47,245,170,0.5);
+  }
+  .hero-desc {
+    max-width: 500px; font-size: 14px; line-height: 1.6; color: #b9bfca;
+  }
+
+  .hero-controls {
+    display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap;
+  }
+
+  @keyframes novaPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(47,245,170,0.5), 0 8px 32px rgba(47,245,170,0.28); }
+    50%       { box-shadow: 0 0 0 10px rgba(47,245,170,0), 0 8px 32px rgba(47,245,170,0.28); }
+  }
+  .play-btn {
+    display: flex; align-items: center; gap: 14px;
+    padding: 17px 48px;
+    border: none; border-radius: 14px; cursor: pointer;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700; font-size: 20px; letter-spacing: 0.14em;
+    color: #03140c;
+    background: linear-gradient(120deg, #3dffaa, #15d8c4);
+    animation: novaPulse 3s ease-in-out infinite;
+    transition: transform .16s, filter .16s, opacity .15s;
+  }
+  .play-btn:hover:not(:disabled) { transform: translateY(-3px) scale(1.025); filter: brightness(1.08); }
+  .play-btn:active:not(:disabled) { transform: translateY(0) scale(0.99); }
+  .play-btn:disabled { opacity: 0.55; cursor: default; animation: none; }
+
+  .play-details {
+    display: flex; flex-direction: column; gap: 12px;
+    min-width: 320px; flex: 1; max-width: 460px;
+  }
+  .play-meta {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+
+  select, .nick-input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    border-radius: 9px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color .15s, background .15s;
+  }
+  select { cursor: pointer; }
+  select:hover, .nick-input:hover { background: rgba(255,255,255,0.08); }
+  select:focus, .nick-input:focus { border-color: var(--green); }
+  select option { background: #0c1016; color: var(--text); }
+
+  .nick-wrap { display: flex; align-items: center; gap: 8px; }
+  .nick-label {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px; letter-spacing: 0.16em; color: var(--muted);
+    white-space: nowrap;
+  }
+  .nick-input { width: 140px; }
+
+  .bar-wrap {
+    height: 6px; background: rgba(255,255,255,0.07);
+    border-radius: 6px; overflow: hidden;
+    display: none;
+  }
+  .bar-fill {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--green2), var(--green));
+    border-radius: 6px;
+    transition: width .15s;
+  }
+  .status-text {
+    font-size: 13px; color: var(--muted); min-height: 18px;
+  }
+  .status-text.ok  { color: var(--ok); }
+  .status-text.err { color: var(--err); }
+
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .info-card {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: rgba(14,17,24,0.6);
+    padding: 20px 22px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .info-card-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px; letter-spacing: 0.2em; color: var(--muted);
+  }
+  .info-card-value {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 22px; font-weight: 700; color: var(--green);
+  }
+  .info-card-sub { font-size: 12px; color: var(--muted); }
+
+  /* mode toggle */
+  .mode-toggle {
+    display: flex; gap: 4px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+    width: fit-content;
+  }
+  .mode-btn {
+    padding: 5px 14px; border: none; border-radius: 7px;
+    background: transparent; color: var(--muted);
+    font-family: 'Chakra Petch', sans-serif; font-size: 12px;
+    letter-spacing: 0.1em; cursor: pointer; transition: all .12s;
+  }
+  .mode-btn.active { background: rgba(47,245,168,0.15); color: var(--green); }
+  .mode-btn:hover:not(.active) { color: var(--text); }
+
+  /* microsoft login btn */
+  .ms-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: background .12s;
+  }
+  .ms-btn:hover { background: rgba(255,255,255,0.10); }
+  .ms-btn.logged { border-color: rgba(47,245,168,0.3); color: var(--green); }
+
+  /* ─── Настройки (RAM, разрешение) ─── */
+  .settings-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .settings-label {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600;
+    color: var(--muted); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .res-input {
+    width: 58px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: var(--text); font-size: 13px; padding: 6px 8px;
+    outline: none; text-align: center;
+  }
+  .res-input:focus { border-color: var(--green); }
+  .res-sep { color: var(--muted); font-size: 13px; }
+
+  /* ─── Сервер ─── */
+  .server-section {
+    margin-top: 20px; padding: 16px 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+  }
+  .server-title {
+    font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .server-input-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .server-ip-input {
+    flex: 1; min-width: 160px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    color: var(--text); font-size: 13px; padding: 7px 12px; outline: none;
+  }
+  .server-ip-input:focus { border-color: var(--green); }
+  .server-port-input {
+    width: 70px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    color: var(--text); font-size: 13px; padding: 7px 8px; outline: none; text-align: center;
+  }
+  .server-port-input:focus { border-color: var(--green); }
+  .btn-server {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .06em; border: none; border-radius: 8px; padding: 7px 14px;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .btn-connect { background: var(--green); color: #06070a; }
+  .btn-connect:hover { filter: brightness(1.1); }
+  .btn-save-srv { background: rgba(126,98,255,.2); color: var(--purple); border: 1px solid var(--purple); }
+  .btn-save-srv:hover { background: rgba(126,98,255,.35); }
+  .server-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .server-item {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 12px;
+  }
+  .server-item-name { font-size: 13px; color: var(--fg); flex: 1; }
+  .server-item-addr { font-size: 11px; color: var(--muted); }
+  .btn-srv-connect { font-size: 10px; padding: 4px 10px; }
+  .btn-srv-del {
+    font-size: 11px; padding: 4px 8px; background: rgba(255,80,80,.15);
+    color: #ff6b6b; border: 1px solid rgba(255,80,80,.3); border-radius: 6px;
+    cursor: pointer; font-family: 'Chakra Petch', sans-serif;
+    transition: background .15s;
+  }
+  .btn-srv-del:hover { background: rgba(255,80,80,.3); }
+
+  /* ─── Кнопка папки модов ─── */
+  .bottom-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .btn-action {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .07em; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 8px 16px; cursor: pointer; background: transparent;
+    color: var(--muted2); transition: all .15s;
+  }
+  .btn-action:hover { border-color: var(--green); color: var(--green); }
+
+
+  /* ── Страницы ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Settings page ── */
+  .settings-page { padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px; }
+  .settings-page-title {
+    font-family: 'Chakra Petch', sans-serif; font-size: 22px; font-weight: 700;
+    color: var(--text); letter-spacing: .05em; margin-bottom: 4px;
+  }
+  .settings-card {
+    background: rgba(14,17,24,0.7); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .settings-card-title {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .18em; color: var(--green); text-transform: uppercase; margin-bottom: 2px;
+  }
+  .setting-row {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .setting-row label {
+    font-size: 13px; color: var(--muted2); min-width: 130px; flex: none;
+  }
+  .setting-input {
+    flex: 1; min-width: 180px; max-width: 360px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 9px; color: var(--text); font-size: 13px;
+    padding: 8px 12px; outline: none; font-family: 'DM Sans', sans-serif;
+  }
+  .setting-input:focus { border-color: var(--green); }
+  .setting-input[type="number"] { max-width: 100px; }
+  textarea.setting-input { resize: vertical; min-height: 60px; max-width: 100%; }
+  .btn-save-settings {
+    font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700;
+    letter-spacing: .1em; padding: 10px 28px; border: none; border-radius: 10px;
+    background: var(--green); color: #06070a; cursor: pointer; transition: filter .15s;
+    align-self: flex-start;
+  }
+  .btn-save-settings:hover { filter: brightness(1.1); }
+  .setting-hint { font-size: 11px; color: var(--muted); margin-top: -8px; }
+
+  /* ── Friends ── */
+  .friend-item {
+    display:flex; align-items:center; gap:10px;
+    background: rgba(255,255,255,0.04); border-radius:10px; padding:10px 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .friend-avatar {
+    width:34px; height:34px; border-radius:50%; flex:none;
+    background: linear-gradient(135deg, var(--green), var(--purple));
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Chakra Petch',sans-serif; font-size:13px; font-weight:700; color:#06070a;
+  }
+  .friend-info { display:flex; flex-direction:column; flex:1; gap:2px; }
+  .friend-name { font-size:13px; font-weight:600; color:var(--text); }
+  .friend-addr { font-size:11px; color:var(--muted); }
+  .friend-online { font-size:10px; color:var(--green); }
+  .btn-friend-connect {
+    font-family:'Chakra Petch',sans-serif; font-size:10px; font-weight:700;
+    padding:5px 12px; border:none; border-radius:7px;
+    background:var(--green); color:#06070a; cursor:pointer; transition:filter .15s;
+    white-space:nowrap;
+  }
+  .btn-friend-connect:hover { filter:brightness(1.1); }
+  .btn-friend-del {
+    font-size:11px; padding:5px 9px; border-radius:7px;
+    background:rgba(255,80,80,.12); color:#ff6b6b;
+    border:1px solid rgba(255,80,80,.25); cursor:pointer;
+    font-family:'Chakra Petch',sans-serif; transition:background .15s;
+  }
+  .btn-friend-del:hover { background:rgba(255,80,80,.28); }
+
+  /* ── Multiplayer page ── */
+  .mp-page { padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px; }
+  .mp-page-title {
+    font-family: 'Chakra Petch', sans-serif; font-size: 22px; font-weight: 700;
+    color: var(--text); letter-spacing: .05em; margin-bottom: 4px;
+  }
+  .mp-card {
+    background: rgba(14,17,24,0.7); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .mp-card-title {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .18em; color: var(--purple); text-transform: uppercase;
+  }
+  .ip-display {
+    font-family: 'Chakra Petch', sans-serif; font-size: 28px; font-weight: 700;
+    color: var(--green); letter-spacing: .05em;
+  }
+  .ip-hint { font-size: 13px; color: var(--muted); }
+  .server-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn-srv-start {
+    font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: .08em; padding: 10px 24px; border: none; border-radius: 10px;
+    background: var(--green); color: #06070a; cursor: pointer; transition: filter .15s;
+  }
+  .btn-srv-start:hover { filter: brightness(1.1); }
+  .btn-srv-start:disabled { opacity: .45; cursor: default; }
+  .btn-srv-stop {
+    font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: .08em; padding: 10px 24px; border: none; border-radius: 10px;
+    background: rgba(255,80,80,.2); color: #ff6b6b;
+    border: 1px solid rgba(255,80,80,.3); cursor: pointer; transition: all .15s;
+  }
+  .btn-srv-stop:hover { background: rgba(255,80,80,.35); }
+  .btn-srv-stop:disabled { opacity: .45; cursor: default; }
+  .srv-status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--muted); transition: background .3s;
+  }
+  .srv-status-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .srv-status-txt { font-size: 13px; color: var(--muted2); }
+  .srv-log {
+    background: #040508; border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; padding: 12px 14px;
+    height: 200px; overflow-y: auto;
+    font-family: monospace; font-size: 12px; color: #7ecc9e;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .srv-cmd-row { display: flex; gap: 8px; }
+  .srv-cmd-input {
+    flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 8px; color: var(--text); font-size: 13px; padding: 7px 12px;
+    outline: none; font-family: monospace;
+  }
+  .srv-cmd-input:focus { border-color: var(--purple); }
+  .btn-cmd-send {
+    padding: 7px 16px; border: none; border-radius: 8px;
+    background: rgba(126,98,255,.25); color: var(--purple);
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: background .15s;
+  }
+  .btn-cmd-send:hover { background: rgba(126,98,255,.4); }
+
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside>
+  <div class="logo-row">
+    <div class="logo-diamond"></div>
+    <div class="logo-text">NOVA</div>
+  </div>
+
+  <nav>
+    <button class="nav-btn active" id="navHome" onclick="showPage('home')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+      Главная
+    </button>
+    <button class="nav-btn" id="navMp" onclick="showPage('mp')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Мультиплеер
+    </button>
+    <button class="nav-btn" id="navSettings" onclick="showPage('settings')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Настройки
+    </button>
+  </nav>
+
+  <div class="section-label">INSTALLED</div>
+
+  <div class="game-item">
+    <div class="game-icon">MC</div>
+    <div class="game-info">
+      <span class="game-name">Minecraft</span>
+      <span class="game-status" id="sideStatus">offline-mode</span>
+    </div>
+  </div>
+
+  <div class="user-row">
+    <div class="user-avatar"></div>
+    <div class="user-info">
+      <span class="user-name" id="sideNick">Mark</span>
+      <span class="user-online"><span class="dot"></span>offline</span>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main>
+<div class="page active" id="pageHome">
+  <header>
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a8290" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Поиск версий…" id="searchInput" autocomplete="off">
+    </div>
+    <div class="header-tag">
+      NOVA LAUNCHER
+      <span class="badge">OFFLINE</span>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-deco" id="heroDeco"></div>
+      <div class="hero-overlay"></div>
+
+      <div class="hero-inner">
+        <div class="badge-row">
+          <span class="badge">FEATURED</span>
+          <span class="genre">Survival · Sandbox · Mojang</span>
+        </div>
+
+        <div>
+          <h1 class="hero-title">MINE<span class="accent">CRAFT</span></h1>
+          <p class="hero-desc">Строй, выживай, исследуй. Offline-режим — без аккаунта, ник стабилен между сессиями.</p>
+        </div>
+
+        <div class="hero-controls">
+          <button class="play-btn" id="playBtn" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            ЗАГРУЗКА...
+          </button>
+
+          <div class="play-details">
+            <div class="play-meta">
+              <!-- ник / MS аккаунт -->
+              <div class="nick-wrap" id="offlineBlock">
+                <span class="nick-label">НИК</span>
+                <input class="nick-input" id="username" type="text" value="Mark" maxlength="16" placeholder="Mark" autocomplete="off">
+              </div>
+              <div class="ms-block" id="msBlock" style="display:none">
+                <button class="ms-btn" id="msLoginBtn" onclick="msLogin()">
+                  <svg width="16" height="16" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                  <span id="msLabel">Войти через Microsoft</span>
+                </button>
+              </div>
+              <!-- версия -->
+              <select id="version"><option>...</option></select>
+              <!-- лоадер -->
+              <select id="loader" title="Mod loader">
+                <option value="vanilla">Vanilla</option>
+                <option value="fabric">Fabric</option>
+              </select>
+
+              <!-- RAM + разрешение -->
+              <div class="settings-row">
+                <span class="settings-label">RAM</span>
+                <select id="ramSelect">
+                  <option value="512">512 MB</option>
+                  <option value="1024">1 GB</option>
+                  <option value="2048" selected>2 GB</option>
+                  <option value="3072">3 GB</option>
+                  <option value="4096">4 GB</option>
+                  <option value="6144">6 GB</option>
+                  <option value="8192">8 GB</option>
+                </select>
+                <span class="settings-label" style="margin-left:6px">РАЗМЕР</span>
+                <input class="res-input" id="resW" type="number" value="854" min="640" max="3840">
+                <span class="res-sep">×</span>
+                <input class="res-input" id="resH" type="number" value="480" min="480" max="2160">
+              </div>
+            </div>
+
+            <!-- переключатель offline/microsoft -->
+            <div class="mode-toggle">
+              <button class="mode-btn active" id="btnOffline" onclick="setMode('offline')">Offline</button>
+              <button class="mode-btn" id="btnMs" disabled title="В разработке" style="opacity:.4;cursor:not-allowed">Microsoft <span style="font-size:9px;letter-spacing:.05em">скоро</span></button>
+            </div>
+
+            <div class="bar-wrap" id="barWrap">
+              <i class="bar-fill" id="barFill"></i>
+            </div>
+            <div class="status-text" id="status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- карточки -->
+    <div class="cards-row">
+      <div class="info-card">
+        <div class="info-card-title">РЕЖИМ</div>
+        <div class="info-card-value">OFFLINE</div>
+        <div class="info-card-sub">Без Microsoft аккаунта</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-title">ВЕРСИЯ</div>
+        <div class="info-card-value" id="cardVersion">—</div>
+        <div class="info-card-sub">Выбранная версия игры</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-title">СТАТУС</div>
+        <div class="info-card-value" id="cardStatus" style="font-size:16px;color:var(--muted2)">WAITING</div>
+        <div class="info-card-sub" id="cardSub">Ожидание запуска</div>
+      </div>
+    </div>
+
+    <!-- Сервер + кнопки -->
+    <div class="server-section">
+      <div class="server-title">🌐 Подключение к серверу</div>
+      <div class="server-input-row">
+        <input class="server-ip-input" id="serverIp" placeholder="IP адрес (play.server.net)" autocomplete="off">
+        <input class="server-port-input" id="serverPort" type="number" value="25565" min="1" max="65535">
+        <button class="btn-server btn-connect" onclick="connectServer()">▶ ИГРАТЬ</button>
+        <button class="btn-server btn-save-srv" onclick="saveServer()">＋ СОХРАНИТЬ</button>
+      </div>
+      <div class="server-list" id="serverList"></div>
+    </div>
+
+    <div class="bottom-actions">
+      <button class="btn-action" onclick="openMods()">📁 Папка модов</button>
+      <button class="btn-action" onclick="openGameDir()">📂 Папка игры</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="page" id="pageSettings">
+  <div class="settings-page">
+    <div>
+      <div class="settings-page-title">Настройки</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px">Настройки запуска и производительности</div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-card-title">🎮 Производительность</div>
+
+      <div class="setting-row">
+        <label>Оперативная память</label>
+        <select class="setting-input" id="stgRam" style="max-width:140px">
+          <option value="512">512 MB</option>
+          <option value="1024">1 GB</option>
+          <option value="2048" selected>2 GB</option>
+          <option value="3072">3 GB</option>
+          <option value="4096">4 GB</option>
+          <option value="6144">6 GB</option>
+          <option value="8192">8 GB</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <label>Разрешение окна</label>
+        <input class="setting-input" id="stgW" type="number" value="854" min="640" max="3840" style="max-width:90px">
+        <span style="color:var(--muted)">×</span>
+        <input class="setting-input" id="stgH" type="number" value="480" min="480" max="2160" style="max-width:90px">
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-card-title">☕ Java</div>
+
+      <div class="setting-row">
+        <label>Путь к Java</label>
+        <input class="setting-input" id="stgJava" type="text" value="java" placeholder="java или /usr/bin/java">
+      </div>
+      <div class="setting-hint">Оставь "java" если Java прописана в PATH. Иначе укажи полный путь до java.exe</div>
+
+      <div class="setting-row">
+        <label>Доп. JVM аргументы</label>
+        <input class="setting-input" id="stgJvmExtra" type="text" placeholder="-XX:+UseG1GC -Dfml.ignoreInvalidMinecraftCertificates=true">
+      </div>
+      <div class="setting-hint">Разделяй пробелами. Основные (-Xmx/-Xms) подставляются автоматически из RAM выше.</div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-card-title">📁 Папки</div>
+      <div class="setting-row">
+        <label>Папка игры</label>
+        <span id="stgGameDir" style="font-size:12px;color:var(--muted);flex:1">—</span>
+        <button class="btn-action" onclick="openGameDir()" style="margin:0">Открыть</button>
+      </div>
+      <div class="setting-row">
+        <label>Папка модов</label>
+        <span style="font-size:12px;color:var(--muted);flex:1">game_data/mods/</span>
+        <button class="btn-action" onclick="openMods()" style="margin:0">Открыть</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center">
+      <button class="btn-save-settings" onclick="saveSettings()">💾 СОХРАНИТЬ</button>
+      <span id="settingsSaved" style="font-size:13px;color:var(--green);opacity:0;transition:opacity .3s">Сохранено ✓</span>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="pageMp">
+  <div class="mp-page">
+    <div>
+      <div class="mp-page-title">Мультиплеер</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px">P2P игра с друзьями без Microsoft и сторонних сервисов</div>
+    </div>
+
+    <!-- Хостинг / UPnP -->
+    <div class="mp-card">
+      <div class="mp-card-title">🚀 Хостить игру (P2P)</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">ВЕРСИЯ</span>
+          <select class="setting-input" id="srvVersion" style="max-width:140px"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">RAM</span>
+          <select class="setting-input" id="srvRam" style="max-width:110px">
+            <option value="512">512 MB</option>
+            <option value="1024" selected>1 GB</option>
+            <option value="2048">2 GB</option>
+            <option value="4096">4 GB</option>
+          </select>
+        </div>
+        <button class="btn-srv-start" id="btnSrvStart" onclick="hostGame()">▶ ХОСТИТЬ</button>
+        <button class="btn-srv-stop"  id="btnSrvStop"  onclick="stopHosting()" disabled>■ СТОП</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="srv-status-dot" id="srvDot"></div>
+          <span class="srv-status-txt" id="srvStatusTxt">Остановлен</span>
+        </div>
+      </div>
+
+      <!-- Внешний IP (показывается при хостинге) -->
+      <div id="hostingInfo" style="display:none;padding:14px;background:rgba(47,245,168,.06);border:1px solid rgba(47,245,168,.2);border-radius:12px">
+        <div style="font-size:11px;color:var(--green);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em;margin-bottom:6px">ВНЕШНИЙ IP ДЛЯ ДРУЗЕЙ</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="ip-display" id="extIp" style="font-size:24px">—</span>
+          <span style="font-size:13px;color:var(--muted)">порт <b style="color:var(--text)">25565</b></span>
+          <span id="upnpBadge" style="font-size:11px;padding:3px 10px;border-radius:6px;font-family:'Chakra Petch',sans-serif"></span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px" id="hostingHint"></div>
+      </div>
+
+      <div class="srv-log" id="srvLog"></div>
+      <div class="srv-cmd-row">
+        <input class="srv-cmd-input" id="srvCmd" placeholder="команда серверу (say, op, kick...)"
+               onkeydown="if(event.key==='Enter') sendCmd()">
+        <button class="btn-cmd-send" onclick="sendCmd()">▶ ОТПРАВИТЬ</button>
+      </div>
+    </div>
+
+    <!-- Список друзей -->
+    <div class="mp-card">
+      <div class="mp-card-title">👥 Друзья</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="setting-input" id="friendName" placeholder="Имя друга" style="max-width:140px">
+        <input class="setting-input" id="friendIp"   placeholder="IP адрес" style="max-width:180px">
+        <input class="setting-input" id="friendPort" type="number" value="25565" style="max-width:90px">
+        <button class="btn-srv-start" style="padding:8px 18px;font-size:11px" onclick="addFriend()">＋ ДОБАВИТЬ</button>
+      </div>
+      <div id="friendList" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
+      <div id="friendEmpty" style="font-size:13px;color:var(--muted);text-align:center;padding:12px 0">
+        Пока нет друзей — добавь выше 👆
+      </div>
+    </div>
+
+    <!-- Локальная сеть -->
+    <div class="mp-card">
+      <div class="mp-card-title">🌐 Локальная сеть (LAN)</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">ТВОЙ LAN IP</div>
+          <div class="ip-display" id="localIp" style="font-size:22px">—</div>
+        </div>
+        <div style="font-size:13px;color:var(--muted2);line-height:1.7">
+          Друзья в одной Wi-Fi сети подключаются напрямую по этому IP.<br>
+          <span style="color:var(--muted)">Порт: <b style="color:var(--text)">25565</b></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const _esc = document.createElement('span');
+  function escapeHtml(str) {
+    _esc.textContent = String(str ?? '');
+    return _esc.innerHTML;
+  }
+  let maxProgress = 0;
+  let currentMode = 'offline'; // 'offline' | 'ms'
+  let msUsername  = null;
+
+  // пиксели-декор
+  (function() {
+    const colors = ['#2ff5a8','#15d8c4','#7e62ff','#22d3ee','#34f5a0',
+                    'transparent','transparent','transparent','transparent'];
+    const deco = $('heroDeco');
+    for (let i = 0; i < 48; i++) {
+      const px = document.createElement('div');
+      px.className = 'px';
+      px.style.background = colors[Math.floor(Math.random() * colors.length)];
+      deco.appendChild(px);
+    }
+  })();
+
+  $('username').addEventListener('input', () => {
+    $('sideNick').textContent = $('username').value || 'Mark';
+  });
+  $('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    Array.from($('version').options).forEach(o => {
+      o.hidden = q && !o.value.toLowerCase().includes(q);
+    });
+  });
+  $('version').addEventListener('change', () => {
+    $('cardVersion').textContent = $('version').value || '—';
+  });
+
+  // --- режим offline/Microsoft ---
+  function setMode(mode) {
+    currentMode = mode;
+    $('btnOffline').classList.toggle('active', mode === 'offline');
+    $('btnMs').classList.toggle('active', mode === 'ms');
+    $('offlineBlock').style.display = mode === 'offline' ? '' : 'none';
+    $('msBlock').style.display      = mode === 'ms'      ? '' : 'none';
+  }
+
+  // --- Microsoft auth ---
+  async function msLogin() {
+    if (msUsername) {
+      // уже вошли — выход
+      await window.pywebview.api.logout();
+      msUsername = null;
+      $('msLabel').textContent = 'Войти через Microsoft';
+      $('msLoginBtn').classList.remove('logged');
+      $('sideNick').textContent = $('username').value || 'Mark';
+      return;
+    }
+    setStatus('Открываю окно входа Microsoft...', '');
+    await window.pywebview.api.start_ms_login();
+  }
+
+  function onMsLoggedIn(username, uuid) {
+    msUsername = username;
+    $('msLabel').textContent = username + ' (выйти)';
+    $('msLoginBtn').classList.add('logged');
+    $('sideNick').textContent = username;
+    setStatus('Вошёл как ' + username, 'ok');
+  }
+  function onMsError(msg) {
+    setStatus('Ошибка входа: ' + msg, 'err');
+  }
+
+  // --- колбэки игры ---
+  function onStatus(text) {
+    setStatus(text); showBar(true);
+    const lc = text.toLowerCase();
+    const label = lc.includes('launch') ? 'LAUNCHING'
+                : lc.includes('fabric') ? 'INSTALLING'
+                : 'DOWNLOADING';
+    $('cardStatus').textContent = label;
+    $('cardStatus').style.color = 'var(--green)';
+    $('cardSub').textContent = text;
+    $('sideStatus').textContent = lc.includes('launch') ? 'запускаю...' : 'скачиваю...';
+  }
+  function onMax(value)   { maxProgress = value || 0; }
+  function onProgress(value) {
+    if (maxProgress > 0)
+      $('barFill').style.width = Math.min(100, (value / maxProgress) * 100) + '%';
+  }
+  function onLaunched() {
+    setStatus('Игра запущена. Приятной игры!', 'ok');
+    $('barFill').style.width = '100%';
+    $('cardStatus').textContent = 'UP TO DATE';
+    $('cardStatus').style.color = 'var(--green)';
+    $('cardSub').textContent = 'Запущена';
+    $('sideStatus').textContent = 'играем 🎮';
+    resetButton();
+  }
+  function onError(msg) {
+    setStatus('Ошибка: ' + msg, 'err');
+    $('cardStatus').textContent = 'ERROR';
+    $('cardStatus').style.color = 'var(--err)';
+    $('cardSub').textContent = msg.slice(0, 40);
+    $('sideStatus').textContent = 'ошибка';
+    showBar(false);
+    resetButton();
+  }
+
+  function setStatus(text, cls) {
+    const s = $('status');
+    s.textContent = text;
+    s.className = 'status-text ' + (cls || '');
+  }
+  function showBar(v) { $('barWrap').style.display = v ? 'block' : 'none'; }
+  function resetButton() {
+    const b = $('playBtn');
+    b.disabled = false;
+    b.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> ИГРАТЬ`;
+  }
+
+  async function play(overrideServer = null, overridePort = null) {
+    const version  = $('version').value;
+    const loader   = $('loader').value;
+    const use_ms   = currentMode === 'ms';
+    const username = use_ms ? (msUsername || '') : $('username').value.trim();
+    const ram    = parseInt($('ramSelect').value) || 2048;
+    const width  = parseInt($('resW').value) || 854;
+    const height = parseInt($('resH').value) || 480;
+    const server = overrideServer || null;
+    const port   = overridePort || 25565;
+
+    if (!use_ms && !username) { setStatus('Введи ник', 'err'); return; }
+    if (use_ms && !msUsername) { setStatus('Сначала войди через Microsoft', 'err'); return; }
+
+    const b = $('playBtn');
+    b.disabled = true; b.innerHTML = '...';
+    setStatus(''); showBar(false);
+    $('barFill').style.width = '0%';
+    $('cardStatus').textContent = 'STARTING';
+    $('cardStatus').style.color = 'var(--muted2)';
+
+    try {
+      const res = await window.pywebview.api.play(version, username, loader, use_ms, ram, width, height, server, port);
+      if (!res.ok) onError(res.error || 'не удалось запустить');
+    } catch(e) { onError(String(e)); }
+  }
+
+  // ─── Серверы ───
+  async function connectServer() {
+    const ip   = $('serverIp').value.trim();
+    const port = parseInt($('serverPort').value) || 25565;
+    if (!ip) { setStatus('Введи IP сервера', 'err'); return; }
+    await play(ip, port);
+  }
+
+  async function saveServer() {
+    const ip   = $('serverIp').value.trim();
+    const port = parseInt($('serverPort').value) || 25565;
+    const name = ip;  // можно потом добавить поле имени
+    if (!ip) { setStatus('Введи IP сервера', 'err'); return; }
+    const res = await window.pywebview.api.add_server(name, ip, port);
+    renderServers(res.servers);
+  }
+
+  async function removeServer(idx) {
+    const res = await window.pywebview.api.remove_server(idx);
+    renderServers(res.servers);
+  }
+
+  function renderServers(servers) {
+    const list = $('serverList');
+    list.innerHTML = '';
+    servers.forEach((srv, i) => {
+      const item = document.createElement('div');
+      item.className = 'server-item';
+      item.innerHTML = `
+        <span class="server-item-name">${escapeHtml(srv.name)}</span>
+        <span class="server-item-addr">${escapeHtml(srv.ip)}:${escapeHtml(srv.port)}</span>
+        <button class="btn-server btn-connect btn-srv-connect" onclick="play('${escapeHtml(srv.ip)}', ${parseInt(srv.port)||25565})">▶</button>
+        <button class="btn-srv-del" onclick="removeServer(${i})">✕</button>`;
+      list.appendChild(item);
+    });
+  }
+
+  // ─── Папка модов ───
+  async function openMods() {
+    await window.pywebview.api.open_mods_folder();
+  }
+
+  async function init() {
+    try {
+      const data = await window.pywebview.api.list_versions();
+      const sel = $('version');
+      sel.innerHTML = '';
+      data.versions.forEach(v => {
+        const o = document.createElement('option');
+        o.value = o.textContent = v;
+        sel.appendChild(o);
+      });
+
+      if (data.saved_username) {
+        $('username').value = data.saved_username;
+        $('sideNick').textContent = data.saved_username;
+      }
+      if (data.saved_version) {
+        const opt = Array.from(sel.options).find(o => o.value === data.saved_version);
+        if (opt) sel.value = data.saved_version;
+      }
+         if (data.saved_loader)  $('loader').value = data.saved_loader;
+      if (data.saved_ram)     { $('ramSelect').value = data.saved_ram; $('stgRam').value = data.saved_ram; }
+      if (data.saved_width)   { $('resW').value = data.saved_width;   $('stgW').value = data.saved_width; }
+      if (data.saved_height)  { $('resH').value = data.saved_height;  $('stgH').value = data.saved_height; }
+      if (data.saved_servers) renderServers(data.saved_servers);
+      if (data.saved_friends) renderFriends(data.saved_friends);
+      if (data.saved_java)        $('stgJava').value = data.saved_java;
+      if (data.saved_jvm_extra !== undefined) $('stgJvmExtra').value = data.saved_jvm_extra;
+
+      // папка игры
+      try {
+        const dirRes = await window.pywebview.api.get_game_dir();
+        if ($('stgGameDir')) $('stgGameDir').textContent = dirRes.path;
+      } catch(e) {}
+
+      // версии для сервера
+      const srvSel = $('srvVersion');
+      if (srvSel) {
+        srvSel.innerHTML = '';
+        data.versions.forEach(v => {
+          const o = document.createElement('option');
+          o.value = o.textContent = v;
+          srvSel.appendChild(o);
+        });
+        if (data.saved_srv_ver) {
+          const opt = Array.from(srvSel.options).find(o => o.value === data.saved_srv_ver);
+          if (opt) srvSel.value = data.saved_srv_ver;
+        }
+      }
+      if (data.saved_srv_ram && $('srvRam')) $('srvRam').value = data.saved_srv_ram;
+
+      // восстанавливаем MS аккаунт если был
+      if (data.ms_account) {
+        msUsername = data.ms_account;
+        $('msLabel').textContent = data.ms_account + ' (выйти)';
+        $('msLoginBtn').classList.add('logged');
+      }
+
+      $('cardVersion').textContent = sel.value;
+      resetButton();
+      $('playBtn').addEventListener('click', play);
+      $('cardStatus').textContent = 'READY';
+      $('cardStatus').style.color = 'var(--green)';
+      $('cardSub').textContent = 'Готов к запуску';
+
+      // Публикуем presence "online" — друзья видят что лаунчер открыт
+      window.pywebview.api.go_online().catch(() => {});
+    } catch(e) {
+      setStatus('Не удалось получить версии: ' + e, 'err');
+    }
+  }
+
+  // ─── Переключение страниц ───
+  function showPage(name) {
+    ['Home','Mp','Settings'].forEach(p => {
+      const pg = document.getElementById('page' + p);
+      if (pg) pg.classList.toggle('active', p.toLowerCase() === name);
+    });
+    document.getElementById('navHome').classList.toggle('active', name === 'home');
+    document.getElementById('navMp').classList.toggle('active', name === 'mp');
+    document.getElementById('navSettings').classList.toggle('active', name === 'settings');
+    if (name === 'mp') { loadLocalIp(); startWatchingFriends(); }
+  }
+
+  // ─── Настройки ───
+  async function saveSettings() {
+    const java  = $('stgJava').value.trim() || 'java';
+    const extra = $('stgJvmExtra').value.trim();
+    const ram   = parseInt($('stgRam').value);
+    const w     = parseInt($('stgW').value);
+    const h     = parseInt($('stgH').value);
+    $('ramSelect').value = ram;
+    $('resW').value = w;
+    $('resH').value = h;
+    await window.pywebview.api.save_settings(java, extra, ram, w, h);
+    const s = $('settingsSaved');
+    s.style.opacity = '1';
+    setTimeout(() => s.style.opacity = '0', 2000);
+  }
+
+  async function openGameDir() {
+    await window.pywebview.api.open_game_dir();
+  }
+
+  // ─── Мультиплеер / сервер ───
+  async function loadLocalIp() {
+    try {
+      const r = await window.pywebview.api.get_local_ip();
+      $('localIp').textContent = r.ip;
+    } catch(e) { $('localIp').textContent = '127.0.0.1'; }
+  }
+
+  async function hostGame() {
+    const ver = $('srvVersion').value;
+    const ram = parseInt($('srvRam').value);
+    if (!ver) { srvLog('❌ Выбери версию'); return; }
+    srvLog('▶ Запускаю сервер ' + ver + '...');
+    $('btnSrvStart').disabled = true;
+    await window.pywebview.api.start_server(ver, ram);
+    // Пробуем UPnP
+    srvLog('🔌 Пробрасываю порт через UPnP...');
+    const upnpRes = await window.pywebview.api.open_port_upnp(25565);
+    if (upnpRes.ok && upnpRes.ip) {
+      $('extIp').textContent = upnpRes.ip + ':25565';
+      $('hostingInfo').style.display = 'block';
+      if (upnpRes.method === 'upnp') {
+        $('upnpBadge').textContent = '✅ UPnP';
+        $('upnpBadge').style.cssText = 'background:rgba(47,245,168,.15);color:var(--green);font-size:11px;padding:3px 10px;border-radius:6px;font-family:Chakra Petch,sans-serif';
+        $('hostingHint').textContent = 'Порт открыт автоматически. Друзья могут подключаться!';
+        srvLog('✅ UPnP: порт 25565 открыт. Внешний IP: ' + upnpRes.ip);
+      } else {
+        $('upnpBadge').textContent = '⚠ Ручной проброс';
+        $('upnpBadge').style.cssText = 'background:rgba(255,200,0,.1);color:#ffd700;font-size:11px;padding:3px 10px;border-radius:6px;font-family:Chakra Petch,sans-serif';
+        $('hostingHint').textContent = 'UPnP не сработал — пробрось порт 25565 вручную в настройках роутера.';
+        srvLog('⚠ UPnP не работает. Внешний IP: ' + upnpRes.ip + ' — пробрось порт 25565 вручную');
+      }
+    } else {
+      srvLog('⚠ Не удалось получить внешний IP');
+    }
+  }
+
+  async function stopHosting() {
+    await window.pywebview.api.stop_server(); // stop_server уже закрывает UPnP порт
+    $('hostingInfo').style.display = 'none';
+    $('extIp').textContent = '—';
+  }
+
+  // обратная совместимость (если вдруг вызывается)
+  async function startServer() { await hostGame(); }
+  async function stopServer()  { await stopHosting(); }
+
+  async function sendCmd() {
+    const cmd = $('srvCmd').value.trim();
+    if (!cmd) return;
+    await window.pywebview.api.server_command(cmd);
+    $('srvCmd').value = '';
+  }
+
+  function srvLog(line) {
+    const log = $('srvLog');
+    const el = document.createElement('div');
+    el.textContent = line;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    while (log.children.length > 300) log.removeChild(log.firstChild);
+  }
+
+  // ─── Relay / онлайн-статусы ───
+  let _watching = false;
+  async function startWatchingFriends() {
+    if (_watching) return;
+    _watching = true;
+    await window.pywebview.api.watch_friends();
+  }
+
+  // Вызывается из Python когда меняется статус друга
+  function onFriendStatus(name, data) {
+    // data = {ip, port, ver, ts} или null (оффлайн)
+    const list  = $('friendList');
+    if (!list) return;
+    // Находим карточку друга по имени и обновляем
+    Array.from(list.children).forEach(el => {
+      if (el.dataset.friendName === name) {
+        const badge = el.querySelector('.friend-status');
+        const joinBtn = el.querySelector('.btn-friend-join');
+        if (data && data.ip) {
+          badge.textContent  = '🟢 ' + data.ver;
+          badge.style.color  = 'var(--green)';
+          joinBtn.style.display = '';
+          joinBtn.onclick = () => play(data.ip, data.port);
+        } else {
+          badge.textContent  = '⚫ оффлайн';
+          badge.style.color  = 'var(--muted)';
+          joinBtn.style.display = 'none';
+        }
+      }
+    });
+  }
+
+  // ─── Друзья ───
+  async function addFriend() {
+    const name = $('friendName').value.trim();
+    const ip   = $('friendIp').value.trim();
+    const port = parseInt($('friendPort').value) || 25565;
+    if (!name || !ip) { return; }
+    const res = await window.pywebview.api.add_friend(name, ip, port);
+    if (res.ok) {
+      $('friendName').value = '';
+      $('friendIp').value   = '';
+      renderFriends(res.friends);
+    } else {
+      alert(res.error || 'Ошибка');
+    }
+  }
+
+  async function removeFriend(idx) {
+    const res = await window.pywebview.api.remove_friend(idx);
+    renderFriends(res.friends);
+  }
+
+  function renderFriends(friends) {
+    const list  = $('friendList');
+    const empty = $('friendEmpty');
+    list.innerHTML = '';
+    if (!friends || friends.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    friends.forEach((f, i) => {
+      const initials = f.name.slice(0, 2).toUpperCase();
+      const el = document.createElement('div');
+      el.className = 'friend-item';
+      el.dataset.friendName = f.name;
+      el.innerHTML = `
+        <div class="friend-avatar">${escapeHtml(initials)}</div>
+        <div class="friend-info">
+          <span class="friend-name">${escapeHtml(f.name)}</span>
+          <span class="friend-addr">${escapeHtml(f.ip || '—')}:${escapeHtml(f.port)}</span>
+          <span class="friend-status" style="font-size:11px;color:var(--muted)">⚫ оффлайн</span>
+        </div>
+        <button class="btn-friend-join btn-friend-connect" style="display:none" onclick="play('${escapeHtml(f.ip)}', ${parseInt(f.port)||25565})">▶ ИГРАТЬ</button>
+        <button class="btn-friend-del" onclick="removeFriend(${i})">✕</button>`;
+      list.appendChild(el);
+    });
+  }
+
+  // ─── Presence (статус активности) ───
+  // Колбэк от Python когда меняется presence друга
+  function onFriendPresence(name, data) {
+    const list = $('friendList');
+    if (!list) return;
+    Array.from(list.children).forEach(el => {
+      if (el.dataset.friendName !== name) return;
+      const badge   = el.querySelector('.friend-status');
+      const joinBtn = el.querySelector('.btn-friend-join');
+      if (!data || !data.status) {
+        badge.textContent = '⚫ оффлайн';
+        badge.style.color = 'var(--muted)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      } else if (data.status === 'playing') {
+        badge.textContent = '🎮 играет' + (data.ver ? ' · ' + data.ver : '');
+        badge.style.color = 'var(--green)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      } else if (data.status === 'hosting') {
+        badge.textContent = '🚀 хостит' + (data.ver ? ' · ' + data.ver : '');
+        badge.style.color = 'var(--purple)';
+        if (joinBtn) {
+          joinBtn.style.display = '';
+          joinBtn.onclick = () => play(data.ip, data.port || 25565);
+        }
+      } else if (data.status === 'idle') {
+        badge.textContent = '💤 бездельничает';
+        badge.style.color = 'var(--muted2)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      } else { // online
+        badge.textContent = '🟢 онлайн';
+        badge.style.color = 'var(--cyan)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      }
+    });
+  }
+
+  // Когда игра закрылась — обновляем статус в сайдбаре
+  function onGameClosed() {
+    $('sideStatus').textContent = 'offline-mode';
+  }
+
+  // Трекинг активности для idle (mousemove/keydown → keep_alive раз в минуту)
+  let _lastActivity = Date.now();
+  document.addEventListener('mousemove', () => { _lastActivity = Date.now(); }, { passive: true });
+  document.addEventListener('keydown',   () => { _lastActivity = Date.now(); }, { passive: true });
+  setInterval(() => {
+    if (Date.now() - _lastActivity < 60000) {
+      window.pywebview?.api?.keep_alive().catch(() => {});
+    }
+  }, 60000);
+
+  function onServerLog(line)  { srvLog(line); }
+  function onServerStarted()  {
+    $('srvDot').classList.add('on');
+    $('srvStatusTxt').textContent = 'Работает';
+    $('btnSrvStart').disabled = true;
+    $('btnSrvStop').disabled  = false;
+    srvLog('✅ Сервер запущен! Порт 25565');
+  }
+  function onServerStopped()  {
+    $('srvDot').classList.remove('on');
+    $('srvStatusTxt').textContent = 'Остановлен';
+    $('btnSrvStart').disabled = false;
+    $('btnSrvStop').disabled  = true;
+    srvLog('🔴 Сервер остановлен');
+  }
+  function onServerError(msg) {
+    srvLog('❌ ' + msg);
+    $('srvDot').classList.remove('on');
+    $('srvStatusTxt').textContent = 'Ошибка';
+    $('btnSrvStart').disabled = false;
+    $('btnSrvStop').disabled  = true;
+  }
+
+  window.addEventListener('pywebviewready', init);
+</script>
+</body>
+</html>
