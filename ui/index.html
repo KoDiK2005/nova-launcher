@@ -396,6 +396,81 @@
   }
   .ms-btn:hover { background: rgba(255,255,255,0.10); }
   .ms-btn.logged { border-color: rgba(47,245,168,0.3); color: var(--green); }
+
+  /* ─── Настройки (RAM, разрешение) ─── */
+  .settings-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .settings-label {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600;
+    color: var(--muted); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .res-input {
+    width: 58px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: var(--fg); font-size: 13px; padding: 6px 8px;
+    outline: none; text-align: center;
+  }
+  .res-input:focus { border-color: var(--green); }
+  .res-sep { color: var(--muted); font-size: 13px; }
+
+  /* ─── Сервер ─── */
+  .server-section {
+    margin-top: 20px; padding: 16px 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+  }
+  .server-title {
+    font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .server-input-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .server-ip-input {
+    flex: 1; min-width: 160px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    color: var(--fg); font-size: 13px; padding: 7px 12px; outline: none;
+  }
+  .server-ip-input:focus { border-color: var(--green); }
+  .server-port-input {
+    width: 70px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    color: var(--fg); font-size: 13px; padding: 7px 8px; outline: none; text-align: center;
+  }
+  .server-port-input:focus { border-color: var(--green); }
+  .btn-server {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .06em; border: none; border-radius: 8px; padding: 7px 14px;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .btn-connect { background: var(--green); color: #06070a; }
+  .btn-connect:hover { filter: brightness(1.1); }
+  .btn-save-srv { background: rgba(126,98,255,.2); color: var(--purple); border: 1px solid var(--purple); }
+  .btn-save-srv:hover { background: rgba(126,98,255,.35); }
+  .server-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .server-item {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 12px;
+  }
+  .server-item-name { font-size: 13px; color: var(--fg); flex: 1; }
+  .server-item-addr { font-size: 11px; color: var(--muted); }
+  .btn-srv-connect { font-size: 10px; padding: 4px 10px; }
+  .btn-srv-del {
+    font-size: 11px; padding: 4px 8px; background: rgba(255,80,80,.15);
+    color: #ff6b6b; border: 1px solid rgba(255,80,80,.3); border-radius: 6px;
+    cursor: pointer; font-family: 'Chakra Petch', sans-serif;
+    transition: background .15s;
+  }
+  .btn-srv-del:hover { background: rgba(255,80,80,.3); }
+
+  /* ─── Кнопка папки модов ─── */
+  .bottom-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .btn-action {
+    font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .07em; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 8px 16px; cursor: pointer; background: transparent;
+    color: var(--muted2); transition: all .15s;
+  }
+  .btn-action:hover { border-color: var(--green); color: var(--green); }
+
 </style>
 </head>
 <body>
@@ -494,12 +569,30 @@
                 <option value="vanilla">Vanilla</option>
                 <option value="fabric">Fabric</option>
               </select>
+
+              <!-- RAM + разрешение -->
+              <div class="settings-row">
+                <span class="settings-label">RAM</span>
+                <select id="ramSelect">
+                  <option value="512">512 MB</option>
+                  <option value="1024">1 GB</option>
+                  <option value="2048" selected>2 GB</option>
+                  <option value="3072">3 GB</option>
+                  <option value="4096">4 GB</option>
+                  <option value="6144">6 GB</option>
+                  <option value="8192">8 GB</option>
+                </select>
+                <span class="settings-label" style="margin-left:6px">РАЗМЕР</span>
+                <input class="res-input" id="resW" type="number" value="854" min="640" max="3840">
+                <span class="res-sep">×</span>
+                <input class="res-input" id="resH" type="number" value="480" min="480" max="2160">
+              </div>
             </div>
 
             <!-- переключатель offline/microsoft -->
             <div class="mode-toggle">
               <button class="mode-btn active" id="btnOffline" onclick="setMode('offline')">Offline</button>
-              <button class="mode-btn" id="btnMs" onclick="setMode('ms')">Microsoft</button>
+              <button class="mode-btn" id="btnMs" disabled title="В разработке" style="opacity:.4;cursor:not-allowed">Microsoft <span style="font-size:9px;letter-spacing:.05em">скоро</span></button>
             </div>
 
             <div class="bar-wrap" id="barWrap">
@@ -528,6 +621,23 @@
         <div class="info-card-value" id="cardStatus" style="font-size:16px;color:var(--muted2)">WAITING</div>
         <div class="info-card-sub" id="cardSub">Ожидание запуска</div>
       </div>
+    </div>
+
+    <!-- Сервер + кнопки -->
+    <div class="server-section">
+      <div class="server-title">🌐 Подключение к серверу</div>
+      <div class="server-input-row">
+        <input class="server-ip-input" id="serverIp" placeholder="IP адрес (play.server.net)" autocomplete="off">
+        <input class="server-port-input" id="serverPort" type="number" value="25565" min="1" max="65535">
+        <button class="btn-server btn-connect" onclick="connectServer()">▶ ИГРАТЬ</button>
+        <button class="btn-server btn-save-srv" onclick="saveServer()">＋ СОХРАНИТЬ</button>
+      </div>
+      <div class="server-list" id="serverList"></div>
+    </div>
+
+    <div class="bottom-actions">
+      <button class="btn-action" onclick="openMods()">📁 Папка модов</button>
+      <button class="btn-action" onclick="openGameDir()">📂 Папка игры</button>
     </div>
 
   </div>
@@ -644,11 +754,16 @@
     b.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> ИГРАТЬ`;
   }
 
-  async function play() {
+  async function play(overrideServer = null, overridePort = null) {
     const version  = $('version').value;
     const loader   = $('loader').value;
     const use_ms   = currentMode === 'ms';
     const username = use_ms ? (msUsername || '') : $('username').value.trim();
+    const ram    = parseInt($('ramSelect').value) || 2048;
+    const width  = parseInt($('resW').value) || 854;
+    const height = parseInt($('resH').value) || 480;
+    const server = overrideServer || null;
+    const port   = overridePort || 25565;
 
     if (!use_ms && !username) { setStatus('Введи ник', 'err'); return; }
     if (use_ms && !msUsername) { setStatus('Сначала войди через Microsoft', 'err'); return; }
@@ -661,9 +776,56 @@
     $('cardStatus').style.color = 'var(--muted2)';
 
     try {
-      const res = await window.pywebview.api.play(version, username, loader, use_ms);
+      const res = await window.pywebview.api.play(version, username, loader, use_ms, ram, width, height, server, port);
       if (!res.ok) onError(res.error || 'не удалось запустить');
     } catch(e) { onError(String(e)); }
+  }
+
+  // ─── Серверы ───
+  async function connectServer() {
+    const ip   = $('serverIp').value.trim();
+    const port = parseInt($('serverPort').value) || 25565;
+    if (!ip) { setStatus('Введи IP сервера', 'err'); return; }
+    await play(ip, port);
+  }
+
+  async function saveServer() {
+    const ip   = $('serverIp').value.trim();
+    const port = parseInt($('serverPort').value) || 25565;
+    const name = ip;  // можно потом добавить поле имени
+    if (!ip) { setStatus('Введи IP сервера', 'err'); return; }
+    const res = await window.pywebview.api.add_server(name, ip, port);
+    renderServers(res.servers);
+  }
+
+  async function removeServer(idx) {
+    const res = await window.pywebview.api.remove_server(idx);
+    renderServers(res.servers);
+  }
+
+  function renderServers(servers) {
+    const list = $('serverList');
+    list.innerHTML = '';
+    servers.forEach((srv, i) => {
+      const item = document.createElement('div');
+      item.className = 'server-item';
+      item.innerHTML = `
+        <span class="server-item-name">${srv.name}</span>
+        <span class="server-item-addr">${srv.ip}:${srv.port}</span>
+        <button class="btn-server btn-connect btn-srv-connect" onclick="play('${srv.ip}', ${srv.port})">▶</button>
+        <button class="btn-srv-del" onclick="removeServer(${i})">✕</button>`;
+      list.appendChild(item);
+    });
+  }
+
+  // ─── Папка модов ───
+  async function openMods() {
+    await window.pywebview.api.open_mods_folder();
+  }
+
+  async function openGameDir() {
+    // TODO: добавить метод в api если нужно
+    await window.pywebview.api.open_mods_folder(); // пока открывает mods
   }
 
   async function init() {
@@ -685,26 +847,4 @@
         const opt = Array.from(sel.options).find(o => o.value === data.saved_version);
         if (opt) sel.value = data.saved_version;
       }
-      if (data.saved_loader) $('loader').value = data.saved_loader;
-
-      // восстанавливаем MS аккаунт если был
-      if (data.ms_account) {
-        msUsername = data.ms_account;
-        $('msLabel').textContent = data.ms_account + ' (выйти)';
-        $('msLoginBtn').classList.add('logged');
-      }
-
-      $('cardVersion').textContent = sel.value;
-      resetButton();
-      $('playBtn').addEventListener('click', play);
-      $('cardStatus').textContent = 'READY';
-      $('cardStatus').style.color = 'var(--green)';
-      $('cardSub').textContent = 'Готов к запуску';
-    } catch(e) {
-      setStatus('Не удалось получить версии: ' + e, 'err');
-    }
-  }
-  window.addEventListener('pywebviewready', init);
-</script>
-</body>
-</html>
+   

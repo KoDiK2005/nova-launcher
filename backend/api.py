@@ -7,33 +7,41 @@ import webview
 
 from . import minecraft
 
-ROOT = os.path.dirname(os.path.dirname(__file__))
+ROOT        = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
 VCACHE_PATH = os.path.join(ROOT, "versions_cache.json")
 AUTH_PATH   = os.path.join(ROOT, "auth.json")
 
+MS_CLIENT_ID    = "00000000402b5328"
+MS_REDIRECT_URI = "https://login.live.com/oauth20_desktop.srf"
 
-# ─── config ───────────────────────────────────────────────────────────────────
 
-def _load_config() -> dict:
+def _load_config():
     try:
         with open(CONFIG_PATH, encoding="utf-8") as f:
             d = json.load(f)
-        return {"username": d.get("username", "Mark"), "version": d.get("version", ""), "loader": d.get("loader", "vanilla")}
+        return {
+            "username": d.get("username", "Mark"),
+            "version":  d.get("version", ""),
+            "loader":   d.get("loader", "vanilla"),
+            "ram":      d.get("ram", 2048),
+            "width":    d.get("width", 854),
+            "height":   d.get("height", 480),
+            "servers":  d.get("servers", []),  # [{name, ip, port}]
+        }
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"username": "Mark", "version": "", "loader": "vanilla"}
+        return {"username": "Mark", "version": "", "loader": "vanilla",
+                "ram": 2048, "width": 854, "height": 480, "servers": []}
 
 
-def _save_config(username: str, version: str, loader: str = "vanilla") -> None:
+def _save_config(data: dict):
     tmp = CONFIG_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"username": username, "version": version, "loader": loader}, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, CONFIG_PATH)
 
 
-# ─── versions cache ───────────────────────────────────────────────────────────
-
-def _get_versions_cached() -> list[str]:
+def _get_versions_cached():
     try:
         versions = [v["id"] for v in minecraft.get_versions()]
         with open(VCACHE_PATH, "w", encoding="utf-8") as f:
@@ -47,9 +55,7 @@ def _get_versions_cached() -> list[str]:
             return ["1.21.1", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.17.1", "1.16.5"]
 
 
-# ─── auth ─────────────────────────────────────────────────────────────────────
-
-def _load_auth() -> dict | None:
+def _load_auth():
     try:
         with open(AUTH_PATH, encoding="utf-8") as f:
             return json.load(f)
@@ -57,54 +63,74 @@ def _load_auth() -> dict | None:
         return None
 
 
-def _save_auth(account: dict) -> None:
+def _save_auth(account):
     tmp = AUTH_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(account, f, ensure_ascii=False, indent=2)
     os.replace(tmp, AUTH_PATH)
 
 
-# ─── Api ──────────────────────────────────────────────────────────────────────
-
 class Api:
     def __init__(self):
         self.window = None
-        self._ms_state         = None
-        self._ms_code_verifier = None
 
-    def _emit(self, js_fn: str, *args):
+    def _emit(self, js_fn, *args):
         if self.window is None:
             return
         payload = ", ".join(json.dumps(a) for a in args)
         self.window.evaluate_js(f"{js_fn}({payload})")
 
-    # --- загрузка данных для UI ---
+    # ─── Версии / конфиг ──────────────────────────────────────────────────────
 
-    def list_versions(self) -> dict:
-        cfg = _load_config()
+    def list_versions(self):
+        cfg  = _load_config()
         auth = _load_auth()
         return {
             "versions":       _get_versions_cached(),
             "saved_username": cfg["username"],
             "saved_version":  cfg["version"],
             "saved_loader":   cfg["loader"],
+            "saved_ram":      cfg["ram"],
+            "saved_width":    cfg["width"],
+            "saved_height":   cfg["height"],
+            "saved_servers":  cfg["servers"],
             "ms_account":     auth["name"] if auth else None,
         }
 
-    def get_auth_status(self) -> dict:
+    # ─── Серверы ──────────────────────────────────────────────────────────────
+
+    def add_server(self, name: str, ip: str, port: int = 25565):
+        cfg = _load_config()
+        cfg["servers"].append({"name": name, "ip": ip, "port": port})
+        _save_config(cfg)
+        return {"ok": True, "servers": cfg["servers"]}
+
+    def remove_server(self, index: int):
+        cfg = _load_config()
+        if 0 <= index < len(cfg["servers"]):
+            cfg["servers"].pop(index)
+            _save_config(cfg)
+        return {"ok": True, "servers": cfg["servers"]}
+
+    # ─── Папка модов ──────────────────────────────────────────────────────────
+
+    def open_mods_folder(self):
+        minecraft.open_mods_folder()
+        return {"ok": True}
+
+    # ─── Microsoft auth ───────────────────────────────────────────────────────
+
+    def get_auth_status(self):
         auth = _load_auth()
         if auth:
             return {"logged_in": True, "username": auth.get("name", ""), "uuid": auth.get("id", "")}
         return {"logged_in": False}
 
-    # --- Microsoft auth ---
-
-    def start_ms_login(self) -> dict:
-        """Открыть окно входа Microsoft."""
+    def start_ms_login(self):
         threading.Thread(target=self._ms_login_worker, daemon=True).start()
         return {"ok": True}
 
-    def logout(self) -> dict:
+    def logout(self):
         try:
             os.remove(AUTH_PATH)
         except FileNotFoundError:
@@ -115,24 +141,21 @@ class Api:
         try:
             import minecraft_launcher_lib as mll
 
-            login_url, state, code_verifier = mll.microsoft_account.get_login_url()
-            self._ms_state         = state
-            self._ms_code_verifier = code_verifier
+            # Без PKCE — старый Xbox client_id его не поддерживает
+            login_url = mll.microsoft_account.get_login_url(MS_CLIENT_ID, MS_REDIRECT_URI)
 
             redirect_url = [None]
-            auth_win = [None]
+            auth_win     = [None]
 
             def on_loaded():
                 try:
                     url = auth_win[0].get_current_url() or ""
-                    # Microsoft редиректит сюда после логина
-                    if "oauth20_desktop.srf" in url and "code=" in url:
+                    if mll.microsoft_account.url_contains_auth_code(url):
                         redirect_url[0] = url
                         auth_win[0].destroy()
                 except Exception:
                     pass
 
-            # Создаём окно входа — работает из фонового потока в pywebview 4.x
             win = webview.create_window(
                 "Microsoft Login", login_url,
                 width=500, height=680, resizable=False
@@ -140,7 +163,6 @@ class Api:
             auth_win[0] = win
             win.events.loaded += on_loaded
 
-            # Ждём пока пользователь войдёт (до 5 минут)
             for _ in range(600):
                 if redirect_url[0]:
                     break
@@ -150,12 +172,22 @@ class Api:
                 self._emit("onMsError", "Login timeout (5 min)")
                 return
 
-            # Обмениваем код на токены
-            login_data = mll.microsoft_account.get_secure_login_data(
-                state, redirect_url[0], code_verifier
+            auth_code = mll.microsoft_account.get_auth_code_from_url(redirect_url[0])
+            if not auth_code:
+                self._emit("onMsError", "Failed to extract auth code")
+                return
+
+            # Проверяем токен-обмен отдельно чтобы видеть реальную ошибку MS
+            token_response = mll.microsoft_account.get_authorization_token(
+                MS_CLIENT_ID, None, MS_REDIRECT_URI, auth_code, None
             )
+            if "access_token" not in token_response:
+                error_desc = token_response.get("error_description", token_response.get("error", str(token_response)))
+                self._emit("onMsError", "MS token error: " + error_desc)
+                return
+
             account = mll.microsoft_account.complete_login(
-                login_data["access_token"], login_data["client_token"]
+                MS_CLIENT_ID, None, MS_REDIRECT_URI, auth_code, None
             )
             _save_auth(account)
             self._emit("onMsLoggedIn", account["name"], account["id"])
@@ -163,21 +195,25 @@ class Api:
         except Exception as e:
             self._emit("onMsError", str(e))
 
-    # --- запуск игры ---
+    # ─── Запуск ───────────────────────────────────────────────────────────────
 
-    def play(self, version_id: str, username: str, loader: str = "vanilla", use_ms: bool = False) -> dict:
+    def play(self, version_id, username, loader="vanilla", use_ms=False,
+             ram=2048, width=854, height=480, server=None, port=25565):
         if not use_ms and not username.strip():
             return {"ok": False, "error": "Введи ник"}
         threading.Thread(
             target=self._play_worker,
-            args=(version_id, username.strip(), loader, use_ms),
+            args=(version_id, username.strip(), loader, use_ms, ram, width, height, server, port),
             daemon=True,
         ).start()
         return {"ok": True}
 
-    def _play_worker(self, version_id: str, username: str, loader: str, use_ms: bool):
+    def _play_worker(self, version_id, username, loader, use_ms, ram, width, height, server, port):
         try:
-            _save_config(username, version_id, loader)
+            cfg = _load_config()
+            cfg.update({"username": username, "version": version_id, "loader": loader,
+                         "ram": ram, "width": width, "height": height})
+            _save_config(cfg)
 
             callback = {
                 "setStatus":   lambda text:  self._emit("onStatus", text),
@@ -186,15 +222,18 @@ class Api:
             }
 
             if loader == "fabric":
-                self._emit("onStatus", f"Preparing Fabric for {version_id}...")
+                self._emit("onStatus", "Preparing Fabric for " + version_id + "...")
                 launch_id = minecraft.install_fabric(version_id, callback)
             else:
                 if not minecraft.is_installed(version_id):
-                    self._emit("onStatus", f"Downloading {version_id}...")
+                    self._emit("onStatus", "Downloading " + version_id + "...")
                     minecraft.install_version(version_id, callback)
                 launch_id = version_id
 
             self._emit("onStatus", "Launching...")
+
+            srv  = server if server else None
+            prt  = int(port) if server and port else None
 
             if use_ms:
                 auth = _load_auth()
@@ -202,14 +241,18 @@ class Api:
                     self._emit("onError", "Not logged in to Microsoft")
                     return
                 proc = minecraft.launch_authenticated(
-                    launch_id, auth["name"], auth["id"], auth["access_token"]
+                    launch_id, auth["name"], auth["id"], auth["access_token"],
+                    ram_mb=ram, width=width, height=height, server=srv, port=prt
                 )
             else:
-                proc = minecraft.launch_offline(launch_id, username)
+                proc = minecraft.launch_offline(
+                    launch_id, username,
+                    ram_mb=ram, width=width, height=height, server=srv, port=prt
+                )
 
             time.sleep(4)
             if proc.poll() is not None:
-                self._emit("onError", f"Game crashed (exit code {proc.poll()})")
+                self._emit("onError", "Game crashed (exit code " + str(proc.poll()) + ")")
                 return
 
             self._emit("onLaunched")
