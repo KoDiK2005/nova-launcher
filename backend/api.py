@@ -9,6 +9,7 @@ from . import minecraft
 from . import server_manager
 from . import upnp
 from . import relay
+from .p2p.manager import P2PManager
 
 ROOT        = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
@@ -31,6 +32,8 @@ DEFAULTS = {
     "jvm_extra":      "",
     "server_version": "",
     "server_ram":     1024,
+    "p2p_priv":       "",
+    "p2p_pub":        "",
 }
 
 
@@ -93,6 +96,10 @@ class Api:
         self.window = None
         self._idle_timer = None
         self._current_username = ""
+        self._p2p = P2PManager(_load_config, _save_config)
+        self._p2p.set_status_callback(
+            lambda friend, status, info: self._emit("onP2PStatus", friend, status, info)
+        )
 
     def _emit(self, js_fn, *args):
         if self.window is None:
@@ -109,6 +116,10 @@ class Api:
         self._reset_idle_timer()
         try:
             minecraft.sync_servers_dat(cfg["servers"])
+        except Exception:
+            pass
+        try:
+            self._p2p.ensure_identity()
         except Exception:
             pass
         return {"ok": True}
@@ -143,6 +154,7 @@ class Api:
         if self._current_username:
             relay.clear_presence(self._current_username)
             relay.clear_session(self._current_username)
+        self._p2p.shutdown()
         relay.disconnect()
 
     # --- Версии / конфиг ------------------------------------------------------
@@ -486,4 +498,17 @@ class Api:
 
     def close_port_upnp(self, port: int = 25565):
         upnp.close_port(int(port))
+        return {"ok": True}
+
+    # --- P2P (NAT traversal, замена Radmin/Hamachi) ----------------------------
+
+    def p2p_connect_to_friend(self, friend_name: str, local_port: int = 25566):
+        """Подключение к серверу друга через P2P-туннель вместо ручного IP.
+        Доступно только для имён из cfg['friends'] — это и есть авторизация."""
+        ok = self._p2p.connect_to_friend(friend_name, int(local_port))
+        return {"ok": ok, "local_port": int(local_port)} if ok else \
+               {"ok": False, "error": "Не друг, либо недостижим"}
+
+    def p2p_disconnect(self, friend_name: str):
+        self._p2p.disconnect(friend_name)
         return {"ok": True}
