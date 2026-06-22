@@ -6,6 +6,7 @@ import threading
 import webview
 
 from . import minecraft
+from . import server_manager
 
 ROOT        = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
@@ -15,29 +16,37 @@ AUTH_PATH   = os.path.join(ROOT, "auth.json")
 MS_CLIENT_ID    = "00000000402b5328"
 MS_REDIRECT_URI = "https://login.live.com/oauth20_desktop.srf"
 
+DEFAULTS = {
+    "username":       "Mark",
+    "version":        "",
+    "loader":         "vanilla",
+    "ram":            2048,
+    "width":          854,
+    "height":         480,
+    "servers":        [],
+    "java_path":      "java",
+    "jvm_extra":      "",
+    "server_version": "",
+    "server_ram":     1024,
+}
 
-def _load_config():
+
+def _load_config() -> dict:
     try:
         with open(CONFIG_PATH, encoding="utf-8") as f:
             d = json.load(f)
-        return {
-            "username": d.get("username", "Mark"),
-            "version":  d.get("version", ""),
-            "loader":   d.get("loader", "vanilla"),
-            "ram":      d.get("ram", 2048),
-            "width":    d.get("width", 854),
-            "height":   d.get("height", 480),
-            "servers":  d.get("servers", []),  # [{name, ip, port}]
-        }
+        return {k: d.get(k, v) for k, v in DEFAULTS.items()}
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"username": "Mark", "version": "", "loader": "vanilla",
-                "ram": 2048, "width": 854, "height": 480, "servers": []}
+        return dict(DEFAULTS)
 
 
 def _save_config(data: dict):
+    # не затираем ключи которых нет в data — мержим с текущим конфигом
+    current = _load_config()
+    current.update(data)
     tmp = CONFIG_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(current, f, ensure_ascii=False, indent=2)
     os.replace(tmp, CONFIG_PATH)
 
 
@@ -86,18 +95,43 @@ class Api:
         cfg  = _load_config()
         auth = _load_auth()
         return {
-            "versions":       _get_versions_cached(),
-            "saved_username": cfg["username"],
-            "saved_version":  cfg["version"],
-            "saved_loader":   cfg["loader"],
-            "saved_ram":      cfg["ram"],
-            "saved_width":    cfg["width"],
-            "saved_height":   cfg["height"],
-            "saved_servers":  cfg["servers"],
-            "ms_account":     auth["name"] if auth else None,
+            "versions":        _get_versions_cached(),
+            "saved_username":  cfg["username"],
+            "saved_version":   cfg["version"],
+            "saved_loader":    cfg["loader"],
+            "saved_ram":       cfg["ram"],
+            "saved_width":     cfg["width"],
+            "saved_height":    cfg["height"],
+            "saved_servers":   cfg["servers"],
+            "saved_java":      cfg["java_path"],
+            "saved_jvm_extra": cfg["jvm_extra"],
+            "saved_srv_ver":   cfg["server_version"],
+            "saved_srv_ram":   cfg["server_ram"],
+            "ms_account":      auth["name"] if auth else None,
         }
 
-    # ─── Серверы ──────────────────────────────────────────────────────────────
+    # ─── Настройки ────────────────────────────────────────────────────────────
+
+    def save_settings(self, java_path, jvm_extra, ram, width, height):
+        _save_config({
+            "java_path": java_path,
+            "jvm_extra": jvm_extra,
+            "ram":       int(ram),
+            "width":     int(width),
+            "height":    int(height),
+        })
+        return {"ok": True}
+
+    def get_game_dir(self):
+        return {"path": minecraft.GAME_DIR}
+
+    def open_game_dir(self):
+        path = minecraft.GAME_DIR
+        os.makedirs(path, exist_ok=True)
+        os.startfile(path)
+        return {"ok": True}
+
+    # ─── Серверы (список) ─────────────────────────────────────────────────────
 
     def add_server(self, name: str, ip: str, port: int = 25565):
         cfg = _load_config()
@@ -110,7 +144,7 @@ class Api:
         if 0 <= index < len(cfg["servers"]):
             cfg["servers"].pop(index)
             _save_config(cfg)
-        return {"ok": True, "servers": cfg["servers"]}
+        return {"ok": True, "servers": _load_config()["servers"]}
 
     # ─── Папка модов ──────────────────────────────────────────────────────────
 
@@ -140,10 +174,7 @@ class Api:
     def _ms_login_worker(self):
         try:
             import minecraft_launcher_lib as mll
-
-            # Без PKCE — старый Xbox client_id его не поддерживает
             login_url = mll.microsoft_account.get_login_url(MS_CLIENT_ID, MS_REDIRECT_URI)
-
             redirect_url = [None]
             auth_win     = [None]
 
@@ -156,10 +187,7 @@ class Api:
                 except Exception:
                     pass
 
-            win = webview.create_window(
-                "Microsoft Login", login_url,
-                width=500, height=680, resizable=False
-            )
+            win = webview.create_window("Microsoft Login", login_url, width=500, height=680, resizable=False)
             auth_win[0] = win
             win.events.loaded += on_loaded
 
@@ -177,7 +205,6 @@ class Api:
                 self._emit("onMsError", "Failed to extract auth code")
                 return
 
-            # Проверяем токен-обмен отдельно чтобы видеть реальную ошибку MS
             token_response = mll.microsoft_account.get_authorization_token(
                 MS_CLIENT_ID, None, MS_REDIRECT_URI, auth_code, None
             )
@@ -195,25 +222,28 @@ class Api:
         except Exception as e:
             self._emit("onMsError", str(e))
 
-    # ─── Запуск ───────────────────────────────────────────────────────────────
+    # ─── Запуск игры ──────────────────────────────────────────────────────────
 
     def play(self, version_id, username, loader="vanilla", use_ms=False,
              ram=2048, width=854, height=480, server=None, port=25565):
         if not use_ms and not username.strip():
             return {"ok": False, "error": "Введи ник"}
+        cfg = _load_config()
         threading.Thread(
             target=self._play_worker,
-            args=(version_id, username.strip(), loader, use_ms, ram, width, height, server, port),
+            args=(version_id, username.strip(), loader, use_ms,
+                  int(ram), int(width), int(height),
+                  server, port,
+                  cfg["java_path"], cfg["jvm_extra"]),
             daemon=True,
         ).start()
         return {"ok": True}
 
-    def _play_worker(self, version_id, username, loader, use_ms, ram, width, height, server, port):
+    def _play_worker(self, version_id, username, loader, use_ms,
+                     ram, width, height, server, port, java_path, jvm_extra):
         try:
-            cfg = _load_config()
-            cfg.update({"username": username, "version": version_id, "loader": loader,
-                         "ram": ram, "width": width, "height": height})
-            _save_config(cfg)
+            _save_config({"username": username, "version": version_id,
+                          "loader": loader, "ram": ram, "width": width, "height": height})
 
             callback = {
                 "setStatus":   lambda text:  self._emit("onStatus", text),
@@ -232,6 +262,7 @@ class Api:
 
             self._emit("onStatus", "Launching...")
 
+            extra_jvm = [a for a in jvm_extra.split() if a] if jvm_extra.strip() else []
             srv  = server if server else None
             prt  = int(port) if server and port else None
 
@@ -242,12 +273,16 @@ class Api:
                     return
                 proc = minecraft.launch_authenticated(
                     launch_id, auth["name"], auth["id"], auth["access_token"],
-                    ram_mb=ram, width=width, height=height, server=srv, port=prt
+                    ram_mb=ram, width=width, height=height,
+                    server=srv, port=prt,
+                    java_path=java_path, extra_jvm=extra_jvm
                 )
             else:
                 proc = minecraft.launch_offline(
                     launch_id, username,
-                    ram_mb=ram, width=width, height=height, server=srv, port=prt
+                    ram_mb=ram, width=width, height=height,
+                    server=srv, port=prt,
+                    java_path=java_path, extra_jvm=extra_jvm
                 )
 
             time.sleep(4)
@@ -259,3 +294,38 @@ class Api:
 
         except Exception as e:
             self._emit("onError", str(e))
+
+    # ─── Мультиплеер-сервер ───────────────────────────────────────────────────
+
+    def get_local_ip(self):
+        return {"ip": server_manager.get_local_ip()}
+
+    def get_server_status(self):
+        return {"running": server_manager.is_running()}
+
+    def start_server(self, version_id: str, ram: int = 1024):
+        cfg = _load_config()
+        _save_config({"server_version": version_id, "server_ram": int(ram)})
+
+        def on_log(line):
+            self._emit("onServerLog", line)
+        def on_started():
+            self._emit("onServerStarted")
+        def on_stopped():
+            self._emit("onServerStopped")
+        def on_error(msg):
+            self._emit("onServerError", msg)
+
+        server_manager.start(
+            version_id, int(ram), cfg["java_path"],
+            on_log, on_started, on_stopped, on_error
+        )
+        return {"ok": True}
+
+    def stop_server(self):
+        server_manager.stop()
+        return {"ok": True}
+
+    def server_command(self, cmd: str):
+        server_manager.send_command(cmd)
+        return {"ok": True}

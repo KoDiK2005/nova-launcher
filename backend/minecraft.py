@@ -1,5 +1,5 @@
 """
-minecraft.py — вся логика работы с самой игрой.
+minecraft.py — логика работы с игрой.
 """
 
 import hashlib
@@ -15,7 +15,6 @@ GAME_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "game_data")
 # ─── Версии ───────────────────────────────────────────────────────────────────
 
 def get_versions() -> list[dict]:
-    """Только релизы. При отсутствии сети — установленные."""
     try:
         all_versions = mll.utils.get_version_list()
     except Exception:
@@ -24,8 +23,7 @@ def get_versions() -> list[dict]:
 
 
 def is_installed(version_id: str) -> bool:
-    installed = {v["id"] for v in mll.utils.get_installed_versions(GAME_DIR)}
-    return version_id in installed
+    return version_id in {v["id"] for v in mll.utils.get_installed_versions(GAME_DIR)}
 
 
 def install_version(version_id: str, callback: dict | None = None) -> None:
@@ -36,24 +34,20 @@ def install_version(version_id: str, callback: dict | None = None) -> None:
 # ─── Fabric ───────────────────────────────────────────────────────────────────
 
 def get_fabric_loader_version() -> str:
-    """Последняя стабильная версия Fabric-лоадера."""
     loaders = mll.fabric.get_all_loader_versions()
     stable = [l for l in loaders if l.get("stable", True)]
     return (stable or loaders)[0]["version"]
 
 
 def fabric_version_id(mc_version: str) -> str:
-    """Строит ID установленной Fabric-версии для запуска."""
     return f"fabric-loader-{get_fabric_loader_version()}-{mc_version}"
 
 
 def is_fabric_installed(mc_version: str) -> bool:
-    installed = {v["id"] for v in mll.utils.get_installed_versions(GAME_DIR)}
-    return fabric_version_id(mc_version) in installed
+    return fabric_version_id(mc_version) in {v["id"] for v in mll.utils.get_installed_versions(GAME_DIR)}
 
 
 def install_fabric(mc_version: str, callback: dict | None = None) -> str:
-    """Устанавливает vanilla + Fabric. Возвращает version_id для запуска."""
     os.makedirs(GAME_DIR, exist_ok=True)
     if not is_installed(mc_version):
         install_version(mc_version, callback)
@@ -64,39 +58,35 @@ def install_fabric(mc_version: str, callback: dict | None = None) -> str:
 # ─── Папка модов ──────────────────────────────────────────────────────────────
 
 def get_mods_dir() -> str:
-    """Папка модов (game_data/mods). Создаём если нет."""
-    mods_path = os.path.join(GAME_DIR, "mods")
-    os.makedirs(mods_path, exist_ok=True)
-    return mods_path
+    path = os.path.join(GAME_DIR, "mods")
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def open_mods_folder() -> None:
-    """Открыть папку модов в проводнике Windows."""
-    path = get_mods_dir()
-    os.startfile(path)
+    os.startfile(get_mods_dir())
 
 
 # ─── Запуск ───────────────────────────────────────────────────────────────────
 
 def _offline_uuid(username: str) -> str:
-    """UUID из ника — как делает сам Minecraft в offline-режиме."""
     data = hashlib.md5(f"OfflinePlayer:{username}".encode()).digest()
     return str(uuid.UUID(bytes=data, version=3))
 
 
-def _build_options(username: str, uuid_str: str, token: str,
-                   ram_mb: int = 2048, width: int = 854, height: int = 480,
-                   server: str | None = None, port: int | None = None) -> dict:
-    """Собирает options для get_minecraft_command."""
+def _build_options(username, uuid_str, token, ram_mb, width, height,
+                   server, port, java_path, extra_jvm) -> dict:
+    jvm = [f"-Xmx{ram_mb}M", "-Xms512M"] + (extra_jvm or [])
     opts = {
         "username":         username,
         "uuid":             uuid_str,
         "token":            token,
-        "jvmArguments":     [f"-Xmx{ram_mb}M", "-Xms512M"],
+        "jvmArguments":     jvm,
         "resolutionWidth":  str(width),
         "resolutionHeight": str(height),
     }
-    # автоподключение к серверу — передаём через gameDirectory аргументы
+    if java_path and java_path.strip() and java_path.strip() != "java":
+        opts["executablePath"] = java_path.strip()
     if server:
         opts["server"] = server
     if port:
@@ -105,20 +95,20 @@ def _build_options(username: str, uuid_str: str, token: str,
 
 
 def launch_offline(version_id: str, username: str,
-                   ram_mb: int = 2048, width: int = 854, height: int = 480,
-                   server: str | None = None, port: int | None = None) -> subprocess.Popen:
-    """Запуск без аккаунта."""
+                   ram_mb=2048, width=854, height=480,
+                   server=None, port=None,
+                   java_path="java", extra_jvm=None) -> subprocess.Popen:
     opts    = _build_options(username, _offline_uuid(username), "",
-                             ram_mb, width, height, server, port)
+                             ram_mb, width, height, server, port, java_path, extra_jvm)
     command = mll.command.get_minecraft_command(version_id, GAME_DIR, opts)
     return subprocess.Popen(command)
 
 
 def launch_authenticated(version_id: str, username: str, uuid_str: str, token: str,
-                         ram_mb: int = 2048, width: int = 854, height: int = 480,
-                         server: str | None = None, port: int | None = None) -> subprocess.Popen:
-    """Запуск с реальным Microsoft-аккаунтом."""
+                          ram_mb=2048, width=854, height=480,
+                          server=None, port=None,
+                          java_path="java", extra_jvm=None) -> subprocess.Popen:
     opts    = _build_options(username, uuid_str, token,
-                             ram_mb, width, height, server, port)
+                             ram_mb, width, height, server, port, java_path, extra_jvm)
     command = mll.command.get_minecraft_command(version_id, GAME_DIR, opts)
     return subprocess.Popen(command)
