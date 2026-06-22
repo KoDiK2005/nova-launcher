@@ -26,7 +26,7 @@ DEFAULTS = {
     "width":          854,
     "height":         480,
     "servers":        [],
-    "friends":        [],   # [{name, ip, port}]
+    "friends":        [],
     "java_path":      "java",
     "jvm_extra":      "",
     "server_version": "",
@@ -44,7 +44,6 @@ def _load_config() -> dict:
 
 
 def _save_config(data: dict):
-    # не затираем ключи которых нет в data — мержим с текущим конфигом
     current = _load_config()
     current.update(data)
     tmp = CONFIG_PATH + ".tmp"
@@ -85,6 +84,8 @@ def _save_auth(account):
 class Api:
     def __init__(self):
         self.window = None
+        self._idle_timer = None
+        self._current_username = ""
 
     def _emit(self, js_fn, *args):
         if self.window is None:
@@ -92,7 +93,53 @@ class Api:
         payload = ", ".join(json.dumps(a) for a in args)
         self.window.evaluate_js(f"{js_fn}({payload})")
 
-    # ─── Версии / конфиг ──────────────────────────────────────────────────────
+    # --- Presence / статус активности ----------------------------------------
+
+    def go_online(self):
+        """Вызывается из JS при старте лаунчера."""
+        cfg = _load_config()
+        self._current_username = cfg["username"]
+        relay.publish_presence(self._current_username, "online")
+        self._reset_idle_timer()
+        return {"ok": True}
+
+    def keep_alive(self):
+        """JS вызывает при активности пользователя — сбрасываем idle-таймер."""
+        if self._current_username:
+            # если были idle, возвращаемся в online
+            relay.publish_presence(self._current_username, "online")
+            self._reset_idle_timer()
+        return {"ok": True}
+
+    def _reset_idle_timer(self):
+        if self._idle_timer:
+            self._idle_timer.cancel()
+        if self._current_username:
+            self._idle_timer = threading.Timer(600, self._go_idle)  # 10 минут
+            self._idle_timer.daemon = True
+            self._idle_timer.start()
+
+    def _go_idle(self):
+        if self._current_username:
+            relay.publish_presence(self._current_username, "idle")
+
+    def _monitor_game(self, proc, username):
+        """Ждём завершения игры — публикуем online обратно."""
+        proc.wait()
+        relay.publish_presence(username, "online")
+        self._reset_idle_timer()
+        self._emit("onGameClosed")
+
+    def clear_own_presence(self):
+        """Вызывается при закрытии лаунчера."""
+        if self._idle_timer:
+            self._idle_timer.cancel()
+        if self._current_username:
+            relay.clear_presence(self._current_username)
+            relay.clear_session(self._current_username)
+        relay.disconnect()
+
+    # --- Версии / конфиг ------------------------------------------------------
 
     def list_versions(self):
         cfg  = _load_config()
@@ -114,7 +161,7 @@ class Api:
             "ms_account":      auth["name"] if auth else None,
         }
 
-    # ─── Настройки ────────────────────────────────────────────────────────────
+    # --- Настройки ------------------------------------------------------------
 
     def save_settings(self, java_path, jvm_extra, ram, width, height):
         _save_config({
@@ -135,7 +182,7 @@ class Api:
         os.startfile(path)
         return {"ok": True}
 
-    # ─── Серверы (список) ─────────────────────────────────────────────────────
+    # --- Серверы (список) -----------------------------------------------------
 
     def add_server(self, name: str, ip: str, port: int = 25565):
         cfg = _load_config()
@@ -150,13 +197,13 @@ class Api:
             _save_config(cfg)
         return {"ok": True, "servers": _load_config()["servers"]}
 
-    # ─── Папка модов ──────────────────────────────────────────────────────────
+    # --- Папка модов ----------------------------------------------------------
 
     def open_mods_folder(self):
         minecraft.open_mods_folder()
         return {"ok": True}
 
-    # ─── Microsoft auth ───────────────────────────────────────────────────────
+    # --- Microsoft auth -------------------------------------------------------
 
     def get_auth_status(self):
         auth = _load_auth()
@@ -209,7 +256,7 @@ class Api:
                 self._emit("onMsError", "Failed to extract auth code")
                 return
 
-            # complete_login делает всё сам: обменивает auth_code → MS token → Xbox → Minecraft
+            # complete_login делает всё сам: auth_code -> MS token -> Xbox -> Minecraft
             # НЕ вызываем get_authorization_token отдельно — auth code одноразовый
             account = mll.microsoft_account.complete_login(
                 MS_CLIENT_ID, None, MS_REDIRECT_URI, auth_code, None
@@ -220,7 +267,7 @@ class Api:
         except Exception as e:
             self._emit("onMsError", str(e))
 
-    # ─── Запуск игры ──────────────────────────────────────────────────────────
+    # --- Запуск игры ----------------------------------------------------------
 
     def play(self, version_id, username, loader="vanilla", use_ms=False,
              ram=2048, width=854, height=480, server=None, port=25565):
@@ -242,6 +289,9 @@ class Api:
         try:
             _save_config({"username": username, "version": version_id,
                           "loader": loader, "ram": ram, "width": width, "height": height})
+
+            # Обновляем никнейм для presence
+            self._current_username = username
 
             callback = {
                 "setStatus":   lambda text:  self._emit("onStatus", text),
@@ -290,10 +340,19 @@ class Api:
 
             self._emit("onLaunched")
 
+            # Публикуем статус "играет" и запускаем мониторинг процесса
+            if self._idle_timer:
+                self._idle_timer.cancel()
+                self._idle_timer = None
+            relay.publish_presence(username, "playing", ver=launch_id)
+            threading.Thread(
+                target=self._monitor_game, args=(proc, username), daemon=True
+            ).start()
+
         except Exception as e:
             self._emit("onError", str(e))
 
-    # ─── Мультиплеер-сервер ───────────────────────────────────────────────────
+    # --- Мультиплеер-сервер ---------------------------------------------------
 
     def get_local_ip(self):
         return {"ip": server_manager.get_local_ip()}
@@ -310,19 +369,24 @@ class Api:
 
         def on_started():
             self._emit("onServerStarted")
-            # публикуем сессию в relay — IP берём через ipify, UPnP открывается в JS
+            # Публикуем presence=hosting и сессию для друзей
             try:
                 ext_ip = upnp.get_external_ip_fallback()
+                relay.publish_presence(cfg["username"], "hosting", ver=version_id, ip=ext_ip)
                 relay.publish_session(cfg["username"], ext_ip, 25565, version_id)
             except Exception:
                 pass
 
         def on_stopped():
             relay.clear_session(cfg["username"])
+            relay.publish_presence(cfg["username"], "online")
+            self._reset_idle_timer()
             self._emit("onServerStopped")
 
         def on_error(msg):
             relay.clear_session(cfg["username"])
+            relay.publish_presence(cfg["username"], "online")
+            self._reset_idle_timer()
             self._emit("onServerError", msg)
 
         server_manager.start(
@@ -334,6 +398,8 @@ class Api:
     def stop_server(self):
         cfg = _load_config()
         relay.clear_session(cfg["username"])
+        relay.publish_presence(cfg["username"], "online")
+        self._reset_idle_timer()
         server_manager.stop()
         upnp.close_port(25565)
         return {"ok": True}
@@ -342,27 +408,33 @@ class Api:
         server_manager.send_command(cmd)
         return {"ok": True}
 
-    # ─── Relay / онлайн-статус друзей ─────────────────────────────────────────
+    # --- Relay / онлайн-статус друзей -----------------------------------------
 
     def watch_friends(self):
         """Подписаться на статус всех друзей. Вызывается при открытии вкладки."""
         cfg = _load_config()
         for f in cfg["friends"]:
             name = f["name"]
-            def make_cb(n):
+            def make_session_cb(n):
                 def cb(data):
-                    self._emit("onFriendStatus", n, data)
+                    self._emit("onFriendSession", n, data)
                 return cb
-            relay.watch_friend(name, make_cb(name))
+            def make_pres_cb(n):
+                def cb(data):
+                    self._emit("onFriendPresence", n, data)
+                return cb
+            relay.watch_friend(name, make_session_cb(name))
+            relay.watch_presence(name, make_pres_cb(name))
         return {"ok": True}
 
     def stop_watching(self):
         cfg = _load_config()
         for f in cfg["friends"]:
             relay.unwatch_friend(f["name"])
+            relay.unwatch_presence(f["name"])
         return {"ok": True}
 
-    # ─── Друзья ───────────────────────────────────────────────────────────────
+    # --- Друзья ---------------------------------------------------------------
 
     def add_friend(self, name: str, ip: str, port: int = 25565):
         cfg = _load_config()
@@ -370,21 +442,25 @@ class Api:
             return {"ok": False, "error": "Уже в списке", "friends": cfg["friends"]}
         cfg["friends"].append({"name": name, "ip": ip, "port": int(port)})
         _save_config(cfg)
-        # сразу подписываемся на статус нового друга
-        def cb(data):
-            self._emit("onFriendStatus", name, data)
-        relay.watch_friend(name, cb)
+        # Сразу подписываемся на оба топика нового друга
+        def session_cb(data):
+            self._emit("onFriendSession", name, data)
+        def pres_cb(data):
+            self._emit("onFriendPresence", name, data)
+        relay.watch_friend(name, session_cb)
+        relay.watch_presence(name, pres_cb)
         return {"ok": True, "friends": cfg["friends"]}
 
     def remove_friend(self, index: int):
         cfg = _load_config()
         if 0 <= index < len(cfg["friends"]):
             relay.unwatch_friend(cfg["friends"][index]["name"])
+            relay.unwatch_presence(cfg["friends"][index]["name"])
             cfg["friends"].pop(index)
             _save_config(cfg)
         return {"ok": True, "friends": _load_config()["friends"]}
 
-    # ─── UPnP / хостинг ───────────────────────────────────────────────────────
+    # --- UPnP / хостинг -------------------------------------------------------
 
     def open_port_upnp(self, port: int = 25565):
         try:

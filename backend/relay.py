@@ -151,3 +151,57 @@ def disconnect() -> None:
             pass
         _client    = None
         _connected = False
+
+
+# --- Presence (статус активности) ---------------------------------------------
+
+PRES_PREFIX = "nova-mc-launcher/v1/pres/"
+
+
+def _pres_topic(username: str) -> str:
+    slug = username.strip().lower()
+    ns = hashlib.md5((slug + APP_SALT).encode()).hexdigest()[:6]
+    return f"{PRES_PREFIX}{ns}_{slug}"
+
+
+def publish_presence(username: str, status: str, ver: str = "", ip: str = "") -> bool:
+    """Публикуем свой статус. status: 'online' | 'playing' | 'hosting' | 'idle'"""
+    if not _ensure_connected():
+        return False
+    payload = json.dumps({
+        "status": status,
+        "ver":    ver,
+        "ip":     ip,
+        "ts":     int(time.time()),
+    })
+    res = _client.publish(_pres_topic(username), payload, qos=1, retain=True)
+    return res.rc == 0
+
+
+def clear_presence(username: str) -> None:
+    """Уходим оффлайн — пустой retain очищает сообщение у всех подписчиков."""
+    if not _MQTT_OK or _client is None:
+        return
+    try:
+        _client.publish(_pres_topic(username), "", qos=1, retain=True)
+    except Exception:
+        pass
+
+
+def watch_presence(friend_username: str, callback) -> None:
+    """Подписываемся на статус активности друга."""
+    if not _ensure_connected():
+        return
+    topic = _pres_topic(friend_username)
+    _subs[topic] = callback
+    _client.subscribe(topic, qos=1)
+
+
+def unwatch_presence(friend_username: str) -> None:
+    topic = _pres_topic(friend_username)
+    _subs.pop(topic, None)
+    if _client:
+        try:
+            _client.unsubscribe(topic)
+        except Exception:
+            pass

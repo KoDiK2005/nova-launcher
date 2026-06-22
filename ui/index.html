@@ -1191,6 +1191,9 @@
       $('cardStatus').textContent = 'READY';
       $('cardStatus').style.color = 'var(--green)';
       $('cardSub').textContent = 'Готов к запуску';
+
+      // Публикуем presence "online" — друзья видят что лаунчер открыт
+      window.pywebview.api.go_online().catch(() => {});
     } catch(e) {
       setStatus('Не удалось получить версии: ' + e, 'err');
     }
@@ -1370,6 +1373,57 @@
       list.appendChild(el);
     });
   }
+
+  // ─── Presence (статус активности) ───
+  // Колбэк от Python когда меняется presence друга
+  function onFriendPresence(name, data) {
+    const list = $('friendList');
+    if (!list) return;
+    Array.from(list.children).forEach(el => {
+      if (el.dataset.friendName !== name) return;
+      const badge   = el.querySelector('.friend-status');
+      const joinBtn = el.querySelector('.btn-friend-join');
+      if (!data || !data.status) {
+        badge.textContent = '⚫ оффлайн';
+        badge.style.color = 'var(--muted)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      } else if (data.status === 'playing') {
+        badge.textContent = '🎮 играет' + (data.ver ? ' · ' + data.ver : '');
+        badge.style.color = 'var(--green)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      } else if (data.status === 'hosting') {
+        badge.textContent = '🚀 хостит' + (data.ver ? ' · ' + data.ver : '');
+        badge.style.color = 'var(--purple)';
+        if (joinBtn) {
+          joinBtn.style.display = '';
+          joinBtn.onclick = () => play(data.ip, data.port || 25565);
+        }
+      } else if (data.status === 'idle') {
+        badge.textContent = '💤 бездельничает';
+        badge.style.color = 'var(--muted2)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      } else { // online
+        badge.textContent = '🟢 онлайн';
+        badge.style.color = 'var(--cyan)';
+        if (joinBtn) joinBtn.style.display = 'none';
+      }
+    });
+  }
+
+  // Когда игра закрылась — обновляем статус в сайдбаре
+  function onGameClosed() {
+    $('sideStatus').textContent = 'offline-mode';
+  }
+
+  // Трекинг активности для idle (mousemove/keydown → keep_alive раз в минуту)
+  let _lastActivity = Date.now();
+  document.addEventListener('mousemove', () => { _lastActivity = Date.now(); }, { passive: true });
+  document.addEventListener('keydown',   () => { _lastActivity = Date.now(); }, { passive: true });
+  setInterval(() => {
+    if (Date.now() - _lastActivity < 60000) {
+      window.pywebview?.api?.keep_alive().catch(() => {});
+    }
+  }, 60000);
 
   function onServerLog(line)  { srvLog(line); }
   function onServerStarted()  {
