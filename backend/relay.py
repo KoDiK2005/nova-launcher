@@ -1,9 +1,9 @@
 """
 relay.py — обнаружение друзей через публичный MQTT брокер.
 Используем broker.emqx.io (бесплатно, без регистрации).
-Данные сессии публикуются с retain=True → друг видит статус сразу при подключении.
+Данные сессии публикуются с retain=True => друг видит статус сразу при подключении.
 
-Топик: nova-mc/host/<username_lower>
+Топик: nova-mc-launcher/v1/host/<hash>_<username_lower>
 Payload: JSON {ip, port, ver, ts} или "" (офлайн)
 """
 
@@ -21,20 +21,18 @@ except ImportError:
 BROKER   = "broker.emqx.io"
 PORT     = 1883
 PREFIX   = "nova-mc-launcher/v1/host/"
-# Добавляем к никнейму хэш чтобы меньше шансов столкнуться с другими
 APP_SALT = "nova2026"
 
 _client    = None
 _connected = False
 _lock      = threading.Lock()
-_subs: dict[str, callable] = {}   # topic → callback
+_subs: dict = {}   # topic -> callback
 
 
-# ─── Утилиты ──────────────────────────────────────────────────────────────────
+# --- Утилиты ------------------------------------------------------------------
 
 def _topic(username: str) -> str:
     slug = username.strip().lower()
-    # небольшой "namespace" — первые 6 символов хэша ника+соли
     ns = hashlib.md5((slug + APP_SALT).encode()).hexdigest()[:6]
     return f"{PREFIX}{ns}_{slug}"
 
@@ -43,7 +41,6 @@ def _on_connect(client, userdata, flags, rc):
     global _connected
     _connected = (rc == 0)
     if _connected:
-        # переподписываемся на все топики (на случай реконнекта)
         for topic in _subs:
             client.subscribe(topic)
 
@@ -70,26 +67,41 @@ def _ensure_connected():
     if not _MQTT_OK:
         return False
     with _lock:
+        # Если клиент завис (создан, но не подключился) — сбрасываем
+        if _client is not None and not _connected:
+            try:
+                _client.loop_stop()
+                _client.disconnect()
+            except Exception:
+                pass
+            _client = None
+
         if _client is None:
-            _client = mqtt.Client(client_id=f"nova_{int(time.time())}", clean_session=True)
+            _client = mqtt.Client(
+                client_id=f"nova_{int(time.time())}", clean_session=True
+            )
             _client.on_connect    = _on_connect
             _client.on_disconnect = _on_disconnect
             _client.on_message    = _on_message
             try:
                 _client.connect_async(BROKER, PORT, keepalive=60)
                 _client.loop_start()
-                # ждём подключения максимум 3 секунды
                 for _ in range(30):
                     if _connected:
                         break
                     time.sleep(0.1)
+                # Таймаут — прибираем за собой, не оставляем зависший клиент
+                if not _connected:
+                    _client.loop_stop()
+                    _client = None
+                    return False
             except Exception:
                 _client = None
                 return False
     return _connected
 
 
-# ─── Публичный API ────────────────────────────────────────────────────────────
+# --- Публичный API ------------------------------------------------------------
 
 def publish_session(username: str, ip: str, port: int, version: str) -> bool:
     """Объявляем что мы хостим. Друзья увидят статус автоматически."""
@@ -110,7 +122,7 @@ def clear_session(username: str) -> None:
         pass
 
 
-def watch_friend(friend_username: str, callback: callable) -> None:
+def watch_friend(friend_username: str, callback) -> None:
     """Подписываемся на статус друга. callback(data | None) при каждом изменении."""
     if not _ensure_connected():
         return
@@ -137,5 +149,5 @@ def disconnect() -> None:
             _client.disconnect()
         except Exception:
             pass
-        _client     = None
-        _connected  = False
+        _client    = None
+        _connected = False

@@ -209,14 +209,8 @@ class Api:
                 self._emit("onMsError", "Failed to extract auth code")
                 return
 
-            token_response = mll.microsoft_account.get_authorization_token(
-                MS_CLIENT_ID, None, MS_REDIRECT_URI, auth_code, None
-            )
-            if "access_token" not in token_response:
-                error_desc = token_response.get("error_description", token_response.get("error", str(token_response)))
-                self._emit("onMsError", "MS token error: " + error_desc)
-                return
-
+            # complete_login делает всё сам: обменивает auth_code → MS token → Xbox → Minecraft
+            # НЕ вызываем get_authorization_token отдельно — auth code одноразовый
             account = mll.microsoft_account.complete_login(
                 MS_CLIENT_ID, None, MS_REDIRECT_URI, auth_code, None
             )
@@ -316,11 +310,10 @@ class Api:
 
         def on_started():
             self._emit("onServerStarted")
-            # публикуем сессию в relay — друзья увидят что мы онлайн
+            # публикуем сессию в relay — IP берём через ipify, UPnP открывается в JS
             try:
-                ext_ip, _ = upnp.open_port(25565)
-                if ext_ip:
-                    relay.publish_session(cfg["username"], ext_ip, 25565, version_id)
+                ext_ip = upnp.get_external_ip_fallback()
+                relay.publish_session(cfg["username"], ext_ip, 25565, version_id)
             except Exception:
                 pass
 

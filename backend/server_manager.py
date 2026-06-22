@@ -51,6 +51,7 @@ def _download_jar(version_id: str, on_progress=None) -> str:
         return jar_path
     url = _get_server_url(version_id)
     r = requests.get(url, stream=True, timeout=60)
+    r.raise_for_status()  # бросит исключение если HTTP-ошибка (4xx/5xx)
     total = int(r.headers.get("content-length", 0))
     done = 0
     with open(jar_path + ".tmp", "wb") as f:
@@ -80,6 +81,7 @@ def start(version_id: str, ram_mb: int, java_path: str,
 
 def _run_worker(version_id, ram_mb, java_path, on_log, on_started, on_stopped, on_error):
     global _proc, _running
+    had_error = False
     try:
         srv_dir = os.path.join(SERVER_DATA, version_id)
         os.makedirs(srv_dir, exist_ok=True)
@@ -124,45 +126,58 @@ def _run_worker(version_id, ram_mb, java_path, on_log, on_started, on_stopped, o
         except AttributeError:
             pass
 
-        _proc = subprocess.Popen(
+        proc = subprocess.Popen(
             cmd, cwd=srv_dir,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding="utf-8", errors="replace",
             creationflags=flags
         )
-        _running = True
+        with _instance_lock:
+            _proc = proc
+            _running = True
         on_started()
 
         # читаем лог в основном потоке
-        for line in _proc.stdout:
+        for line in proc.stdout:
             on_log(line.rstrip())
 
-        _proc.wait()
+        proc.wait()
 
     except Exception as e:
+        had_error = True
         on_error(str(e))
     finally:
-        _running = False
-        _proc = None
-        on_stopped()
+        with _instance_lock:
+            _running = False
+            _proc = None
+        # on_stopped вызываем только если не было ошибки —
+        # иначе UI уже показал ошибку и не нужно сразу переключаться в "остановлен"
+        if not had_error:
+            on_stopped()
 
 
 def stop():
     global _proc, _running
-    if _proc and _running:
+    # Копируем под локом чтобы избежать race condition с _run_worker
+    with _instance_lock:
+        proc = _proc
+        running = _running
+    if proc and running:
         try:
-            _proc.stdin.write("stop\n")
-            _proc.stdin.flush()
+            proc.stdin.write("stop\n")
+            proc.stdin.flush()
         except Exception:
-            _proc.terminate()
+            proc.terminate()
 
 
 def send_command(cmd: str):
-    global _proc
-    if _proc and _running:
+    with _instance_lock:
+        proc = _proc
+        running = _running
+    if proc and running:
         try:
-            _proc.stdin.write(cmd + "\n")
-            _proc.stdin.flush()
+            proc.stdin.write(cmd + "\n")
+            proc.stdin.flush()
         except Exception:
             pass

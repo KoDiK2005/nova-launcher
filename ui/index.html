@@ -407,7 +407,7 @@
   }
   .res-input {
     width: 58px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 8px; color: var(--fg); font-size: 13px; padding: 6px 8px;
+    border-radius: 8px; color: var(--text); font-size: 13px; padding: 6px 8px;
     outline: none; text-align: center;
   }
   .res-input:focus { border-color: var(--green); }
@@ -427,13 +427,13 @@
   .server-ip-input {
     flex: 1; min-width: 160px; background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-    color: var(--fg); font-size: 13px; padding: 7px 12px; outline: none;
+    color: var(--text); font-size: 13px; padding: 7px 12px; outline: none;
   }
   .server-ip-input:focus { border-color: var(--green); }
   .server-port-input {
     width: 70px; background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-    color: var(--fg); font-size: 13px; padding: 7px 8px; outline: none; text-align: center;
+    color: var(--text); font-size: 13px; padding: 7px 8px; outline: none; text-align: center;
   }
   .server-port-input:focus { border-color: var(--green); }
   .btn-server {
@@ -941,6 +941,11 @@
 
 <script>
   const $ = id => document.getElementById(id);
+  const _esc = document.createElement('span');
+  function escapeHtml(str) {
+    _esc.textContent = String(str ?? '');
+    return _esc.innerHTML;
+  }
   let maxProgress = 0;
   let currentMode = 'offline'; // 'offline' | 'ms'
   let msUsername  = null;
@@ -1009,10 +1014,14 @@
   // --- колбэки игры ---
   function onStatus(text) {
     setStatus(text); showBar(true);
-    $('cardStatus').textContent = 'DOWNLOADING';
+    const lc = text.toLowerCase();
+    const label = lc.includes('launch') ? 'LAUNCHING'
+                : lc.includes('fabric') ? 'INSTALLING'
+                : 'DOWNLOADING';
+    $('cardStatus').textContent = label;
     $('cardStatus').style.color = 'var(--green)';
     $('cardSub').textContent = text;
-    $('sideStatus').textContent = 'скачиваю...';
+    $('sideStatus').textContent = lc.includes('launch') ? 'запускаю...' : 'скачиваю...';
   }
   function onMax(value)   { maxProgress = value || 0; }
   function onProgress(value) {
@@ -1106,9 +1115,9 @@
       const item = document.createElement('div');
       item.className = 'server-item';
       item.innerHTML = `
-        <span class="server-item-name">${srv.name}</span>
-        <span class="server-item-addr">${srv.ip}:${srv.port}</span>
-        <button class="btn-server btn-connect btn-srv-connect" onclick="play('${srv.ip}', ${srv.port})">▶</button>
+        <span class="server-item-name">${escapeHtml(srv.name)}</span>
+        <span class="server-item-addr">${escapeHtml(srv.ip)}:${escapeHtml(srv.port)}</span>
+        <button class="btn-server btn-connect btn-srv-connect" onclick="play('${escapeHtml(srv.ip)}', ${parseInt(srv.port)||25565})">▶</button>
         <button class="btn-srv-del" onclick="removeServer(${i})">✕</button>`;
       list.appendChild(item);
     });
@@ -1117,11 +1126,6 @@
   // ─── Папка модов ───
   async function openMods() {
     await window.pywebview.api.open_mods_folder();
-  }
-
-  async function openGameDir() {
-    // TODO: добавить метод в api если нужно
-    await window.pywebview.api.open_mods_folder(); // пока открывает mods
   }
 
   async function init() {
@@ -1262,8 +1266,7 @@
   }
 
   async function stopHosting() {
-    await window.pywebview.api.stop_server();
-    await window.pywebview.api.close_port_upnp(25565);
+    await window.pywebview.api.stop_server(); // stop_server уже закрывает UPnP порт
     $('hostingInfo').style.display = 'none';
     $('extIp').textContent = '—';
   }
@@ -1356,13 +1359,13 @@
       el.className = 'friend-item';
       el.dataset.friendName = f.name;
       el.innerHTML = `
-        <div class="friend-avatar">${initials}</div>
+        <div class="friend-avatar">${escapeHtml(initials)}</div>
         <div class="friend-info">
-          <span class="friend-name">${f.name}</span>
-          <span class="friend-addr">${f.ip || '—'}:${f.port}</span>
+          <span class="friend-name">${escapeHtml(f.name)}</span>
+          <span class="friend-addr">${escapeHtml(f.ip || '—')}:${escapeHtml(f.port)}</span>
           <span class="friend-status" style="font-size:11px;color:var(--muted)">⚫ оффлайн</span>
         </div>
-        <button class="btn-friend-join btn-friend-connect" style="display:none" onclick="play('${f.ip}', ${f.port})">▶ ИГРАТЬ</button>
+        <button class="btn-friend-join btn-friend-connect" style="display:none" onclick="play('${escapeHtml(f.ip)}', ${parseInt(f.port)||25565})">▶ ИГРАТЬ</button>
         <button class="btn-friend-del" onclick="removeFriend(${i})">✕</button>`;
       list.appendChild(el);
     });
