@@ -24,8 +24,23 @@ def get_versions() -> list[dict]:
     return [v for v in all_versions if v["type"] == "release"]
 
 
+MIN_CLIENT_JAR_SIZE = 200 * 1024  # реальный client.jar — десятки МБ; меньше = битая/неполная закачка
+
 def is_installed(version_id: str) -> bool:
-    return version_id in {v["id"] for v in mll.utils.get_installed_versions(GAME_DIR)}
+    """mll.utils.get_installed_versions() считает версию "установленной" по
+    одному наличию <id>.json — если скачка client.jar прервалась (сеть,
+    отключили лаунчер на середине), json остаётся, а jar нет/битый, и
+    is_installed() лжёт "True". Игра потом падает с
+    'Could not find or load main class ... ClassNotFoundException', потому
+    что в classpath есть путь к jar, которого не существует. Поэтому
+    проверяем сам файл, а не только метаданные библиотеки."""
+    if version_id not in {v["id"] for v in mll.utils.get_installed_versions(GAME_DIR)}:
+        return False
+    jar_path = os.path.join(GAME_DIR, "versions", version_id, f"{version_id}.jar")
+    try:
+        return os.path.getsize(jar_path) >= MIN_CLIENT_JAR_SIZE
+    except OSError:
+        return False
 
 
 def install_version(version_id: str, callback: dict | None = None) -> None:
@@ -138,22 +153,6 @@ def _build_options(username, uuid_str, token, ram_mb, width, height,
     return opts
 
 
-def _log_launch(command: list) -> None:
-    """Пишем команду запуска в лог для отладки."""
-    import datetime
-    log_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "launch_debug.log")
-    with open(log_path, "w", encoding="utf-8") as f:
-        f.write(f"Launch time: {datetime.datetime.now()}\n")
-        f.write(f"GAME_DIR: {GAME_DIR}\n")
-        f.write("Command:\n")
-        for arg in command:
-            f.write(f"  {arg}\n")
-        # Ищем --gameDir
-        for i, arg in enumerate(command):
-            if arg == "--gameDir" and i + 1 < len(command):
-                f.write(f"\n--gameDir = {command[i+1]}\n")
-
-
 def launch_offline(version_id: str, username: str,
                    ram_mb=2048, width=854, height=480,
                    server=None, port=None,
@@ -161,16 +160,6 @@ def launch_offline(version_id: str, username: str,
     opts    = _build_options(username, _offline_uuid(username), "",
                              ram_mb, width, height, server, port, java_path, extra_jvm)
     command = mll.command.get_minecraft_command(version_id, GAME_DIR, opts)
-    _log_launch(command)
-    # Ищем не-строки в команде
-    for _i, _a in enumerate(command):
-        if not isinstance(_a, str):
-            import datetime
-            _dbg = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cmd_debug.log")
-            with open(_dbg, "w", encoding="utf-8") as _f:
-                _f.write(f"Non-str at [{_i}]: type={type(_a).__name__} val={repr(_a)}\n")
-                _f.write(f"Prev: {command[_i-1] if _i > 0 else 'N/A'}\n")
-                _f.write(f"Next: {command[_i+1] if _i+1 < len(command) else 'N/A'}\n")
     return subprocess.Popen(command)
 
 
