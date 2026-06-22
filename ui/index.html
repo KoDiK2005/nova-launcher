@@ -1201,7 +1201,7 @@
     document.getElementById('navHome').classList.toggle('active', name === 'home');
     document.getElementById('navMp').classList.toggle('active', name === 'mp');
     document.getElementById('navSettings').classList.toggle('active', name === 'settings');
-    if (name === 'mp') loadLocalIp();
+    if (name === 'mp') { loadLocalIp(); startWatchingFriends(); }
   }
 
   // ─── Настройки ───
@@ -1288,6 +1288,38 @@
     while (log.children.length > 300) log.removeChild(log.firstChild);
   }
 
+  // ─── Relay / онлайн-статусы ───
+  let _watching = false;
+  async function startWatchingFriends() {
+    if (_watching) return;
+    _watching = true;
+    await window.pywebview.api.watch_friends();
+  }
+
+  // Вызывается из Python когда меняется статус друга
+  function onFriendStatus(name, data) {
+    // data = {ip, port, ver, ts} или null (оффлайн)
+    const list  = $('friendList');
+    if (!list) return;
+    // Находим карточку друга по имени и обновляем
+    Array.from(list.children).forEach(el => {
+      if (el.dataset.friendName === name) {
+        const badge = el.querySelector('.friend-status');
+        const joinBtn = el.querySelector('.btn-friend-join');
+        if (data && data.ip) {
+          badge.textContent  = '🟢 ' + data.ver;
+          badge.style.color  = 'var(--green)';
+          joinBtn.style.display = '';
+          joinBtn.onclick = () => play(data.ip, data.port);
+        } else {
+          badge.textContent  = '⚫ оффлайн';
+          badge.style.color  = 'var(--muted)';
+          joinBtn.style.display = 'none';
+        }
+      }
+    });
+  }
+
   // ─── Друзья ───
   async function addFriend() {
     const name = $('friendName').value.trim();
@@ -1322,13 +1354,15 @@
       const initials = f.name.slice(0, 2).toUpperCase();
       const el = document.createElement('div');
       el.className = 'friend-item';
+      el.dataset.friendName = f.name;
       el.innerHTML = `
         <div class="friend-avatar">${initials}</div>
         <div class="friend-info">
           <span class="friend-name">${f.name}</span>
-          <span class="friend-addr">${f.ip}:${f.port}</span>
+          <span class="friend-addr">${f.ip || '—'}:${f.port}</span>
+          <span class="friend-status" style="font-size:11px;color:var(--muted)">⚫ оффлайн</span>
         </div>
-        <button class="btn-friend-connect" onclick="play('${f.ip}', ${f.port})">▶ ИГРАТЬ</button>
+        <button class="btn-friend-join btn-friend-connect" style="display:none" onclick="play('${f.ip}', ${f.port})">▶ ИГРАТЬ</button>
         <button class="btn-friend-del" onclick="removeFriend(${i})">✕</button>`;
       list.appendChild(el);
     });

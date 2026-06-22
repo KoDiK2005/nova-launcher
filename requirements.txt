@@ -2,3 +2,4 @@ pywebview==4.4.1
 minecraft-launcher-lib>=6.4
 requests
 miniupnpc
+paho-mqtt>=1.6

@@ -8,6 +8,7 @@ import webview
 from . import minecraft
 from . import server_manager
 from . import upnp
+from . import relay
 
 ROOT        = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
@@ -312,11 +313,23 @@ class Api:
 
         def on_log(line):
             self._emit("onServerLog", line)
+
         def on_started():
             self._emit("onServerStarted")
+            # публикуем сессию в relay — друзья увидят что мы онлайн
+            try:
+                ext_ip, _ = upnp.open_port(25565)
+                if ext_ip:
+                    relay.publish_session(cfg["username"], ext_ip, 25565, version_id)
+            except Exception:
+                pass
+
         def on_stopped():
+            relay.clear_session(cfg["username"])
             self._emit("onServerStopped")
+
         def on_error(msg):
+            relay.clear_session(cfg["username"])
             self._emit("onServerError", msg)
 
         server_manager.start(
@@ -326,6 +339,8 @@ class Api:
         return {"ok": True}
 
     def stop_server(self):
+        cfg = _load_config()
+        relay.clear_session(cfg["username"])
         server_manager.stop()
         upnp.close_port(25565)
         return {"ok": True}
@@ -334,10 +349,51 @@ class Api:
         server_manager.send_command(cmd)
         return {"ok": True}
 
+    # ─── Relay / онлайн-статус друзей ─────────────────────────────────────────
+
+    def watch_friends(self):
+        """Подписаться на статус всех друзей. Вызывается при открытии вкладки."""
+        cfg = _load_config()
+        for f in cfg["friends"]:
+            name = f["name"]
+            def make_cb(n):
+                def cb(data):
+                    self._emit("onFriendStatus", n, data)
+                return cb
+            relay.watch_friend(name, make_cb(name))
+        return {"ok": True}
+
+    def stop_watching(self):
+        cfg = _load_config()
+        for f in cfg["friends"]:
+            relay.unwatch_friend(f["name"])
+        return {"ok": True}
+
+    # ─── Друзья ───────────────────────────────────────────────────────────────
+
+    def add_friend(self, name: str, ip: str, port: int = 25565):
+        cfg = _load_config()
+        if any(f["name"].lower() == name.lower() for f in cfg["friends"]):
+            return {"ok": False, "error": "Уже в списке", "friends": cfg["friends"]}
+        cfg["friends"].append({"name": name, "ip": ip, "port": int(port)})
+        _save_config(cfg)
+        # сразу подписываемся на статус нового друга
+        def cb(data):
+            self._emit("onFriendStatus", name, data)
+        relay.watch_friend(name, cb)
+        return {"ok": True, "friends": cfg["friends"]}
+
+    def remove_friend(self, index: int):
+        cfg = _load_config()
+        if 0 <= index < len(cfg["friends"]):
+            relay.unwatch_friend(cfg["friends"][index]["name"])
+            cfg["friends"].pop(index)
+            _save_config(cfg)
+        return {"ok": True, "friends": _load_config()["friends"]}
+
     # ─── UPnP / хостинг ───────────────────────────────────────────────────────
 
     def open_port_upnp(self, port: int = 25565):
-        """Пробрасывает порт через UPnP, возвращает внешний IP."""
         try:
             ext_ip, method = upnp.open_port(int(port))
             return {"ok": True, "ip": ext_ip, "method": method}
@@ -347,30 +403,3 @@ class Api:
     def close_port_upnp(self, port: int = 25565):
         upnp.close_port(int(port))
         return {"ok": True}
-
-    # ─── Друзья ───────────────────────────────────────────────────────────────
-
-    def add_friend(self, name: str, ip: str, port: int = 25565):
-        cfg = _load_config()
-        # не дублируем по IP
-        if any(f["ip"] == ip for f in cfg["friends"]):
-            return {"ok": False, "error": "Уже в списке", "friends": cfg["friends"]}
-        cfg["friends"].append({"name": name, "ip": ip, "port": int(port)})
-        _save_config(cfg)
-        return {"ok": True, "friends": cfg["friends"]}
-
-    def remove_friend(self, index: int):
-        cfg = _load_config()
-        if 0 <= index < len(cfg["friends"]):
-            cfg["friends"].pop(index)
-            _save_config(cfg)
-        return {"ok": True, "friends": _load_config()["friends"]}
-
-    def update_friend_ip(self, index: int, ip: str, port: int = 25565):
-        """Обновляет IP друга (когда тот стал хостить)."""
-        cfg = _load_config()
-        if 0 <= index < len(cfg["friends"]):
-            cfg["friends"][index]["ip"]   = ip
-            cfg["friends"][index]["port"] = int(port)
-            _save_config(cfg)
-        return {"ok": True, "friends": _load_config()["friends"]}
