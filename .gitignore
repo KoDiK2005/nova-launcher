@@ -8,12 +8,20 @@ venv/
 .minecraft/
 game_data/
 
+# Серверные данные (JARы, миры, логи сервера)
+server_data/
+
+# Логи лаунчера
+logs/
+*.log
+*.log.gz
+
 # IDE
 .vscode/
 .idea/
 
 # Прочее
-*.log
+*.tmp
 config.json
 versions_cache.json
 auth.json
