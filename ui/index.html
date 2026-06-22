@@ -917,8 +917,58 @@
           <span class="ip-display" id="extIp" style="font-size:24px">—</span>
           <span style="font-size:13px;color:var(--muted)">порт <b style="color:var(--text)">25565</b></span>
           <span id="upnpBadge" style="font-size:11px;padding:3px 10px;border-radius:6px;font-family:'Chakra Petch',sans-serif"></span>
+          <button class="btn-srv-start" style="padding:8px 16px;font-size:11px" onclick="joinOwnServer()">▶ ЗАЙТИ НА СВОЙ СЕРВЕР</button>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:6px" id="hostingHint"></div>
+      </div>
+
+      <!-- Настройки мира -->
+      <div class="mp-card-title" style="font-size:14px;margin-top:10px">⚙ Настройки мира</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">MOTD</span>
+          <input class="setting-input" id="srvMotd" placeholder="NOVA Launcher Server" style="max-width:220px">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">РЕЖИМ</span>
+          <select class="setting-input" id="srvGamemode" style="max-width:130px">
+            <option value="survival">Survival</option>
+            <option value="creative">Creative</option>
+            <option value="adventure">Adventure</option>
+            <option value="spectator">Spectator</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">СЛОЖНОСТЬ</span>
+          <select class="setting-input" id="srvDifficulty" style="max-width:130px">
+            <option value="peaceful">Peaceful</option>
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">ИГРОКОВ МАКС</span>
+          <input class="setting-input" id="srvMaxPlayers" type="number" min="1" max="200" value="20" style="max-width:90px">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">SEED</span>
+          <input class="setting-input" id="srvSeed" placeholder="случайный" style="max-width:150px">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;color:var(--muted);font-family:'Chakra Petch',sans-serif;letter-spacing:.1em">ОБЗОР (чанков)</span>
+          <input class="setting-input" id="srvViewDist" type="number" min="3" max="32" value="10" style="max-width:90px">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text)">
+          <input type="checkbox" id="srvPvp" checked> PvP
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text)">
+          <input type="checkbox" id="srvHardcore"> Hardcore
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text)">
+          <input type="checkbox" id="srvWhitelist"> Whitelist
+        </label>
+        <span style="font-size:11px;color:var(--muted)" id="srvSettingsHint">Настройки применяются при следующем запуске сервера</span>
       </div>
 
       <div class="srv-log" id="srvLog"></div>
@@ -1202,6 +1252,7 @@
         }
       }
       if (data.saved_srv_ram && $('srvRam')) $('srvRam').value = data.saved_srv_ram;
+      if (data.saved_srv_settings) applyServerSettings(data.saved_srv_settings);
 
       // восстанавливаем MS аккаунт если был
       if (data.ms_account) {
@@ -1264,13 +1315,40 @@
     } catch(e) { $('localIp').textContent = '127.0.0.1'; }
   }
 
+  function applyServerSettings(s) {
+    if ($('srvMotd'))       $('srvMotd').value = s.motd ?? '';
+    if ($('srvGamemode'))   $('srvGamemode').value = s.gamemode ?? 'survival';
+    if ($('srvDifficulty')) $('srvDifficulty').value = s.difficulty ?? 'normal';
+    if ($('srvMaxPlayers')) $('srvMaxPlayers').value = s.max_players ?? 20;
+    if ($('srvSeed'))       $('srvSeed').value = s.level_seed ?? '';
+    if ($('srvViewDist'))   $('srvViewDist').value = s.view_distance ?? 10;
+    if ($('srvPvp'))        $('srvPvp').checked = s.pvp !== false;
+    if ($('srvHardcore'))   $('srvHardcore').checked = !!s.hardcore;
+    if ($('srvWhitelist'))  $('srvWhitelist').checked = !!s.white_list;
+  }
+
+  function collectServerSettings() {
+    return {
+      motd:          $('srvMotd').value.trim() || 'NOVA Launcher Server',
+      gamemode:      $('srvGamemode').value,
+      difficulty:    $('srvDifficulty').value,
+      max_players:   parseInt($('srvMaxPlayers').value) || 20,
+      level_seed:    $('srvSeed').value.trim(),
+      view_distance: parseInt($('srvViewDist').value) || 10,
+      pvp:           $('srvPvp').checked,
+      hardcore:      $('srvHardcore').checked,
+      white_list:    $('srvWhitelist').checked,
+    };
+  }
+
   async function hostGame() {
     const ver = $('srvVersion').value;
     const ram = parseInt($('srvRam').value);
     if (!ver) { srvLog('❌ Выбери версию'); return; }
-    srvLog('▶ Запускаю сервер ' + ver + '...');
+    const settings = collectServerSettings();
+    srvLog('▶ Запускаю сервер ' + ver + ' (' + settings.gamemode + ', ' + settings.difficulty + ')...');
     $('btnSrvStart').disabled = true;
-    await window.pywebview.api.start_server(ver, ram);
+    await window.pywebview.api.start_server(ver, ram, settings);
     // Пробуем UPnP
     srvLog('🔌 Пробрасываю порт через UPnP...');
     const upnpRes = await window.pywebview.api.open_port_upnp(25565);
@@ -1291,6 +1369,26 @@
     } else {
       srvLog('⚠ Не удалось получить внешний IP');
     }
+    // Чтобы сервер сразу был виден во вкладке "Сетевая игра" самого Minecraft
+    // (servers.dat), а не только в карточке друзей — добавляем его в список.
+    // add_server идемпотентен: если 127.0.0.1:25565 уже есть — просто обновит имя/версию.
+    const srvRes = await window.pywebview.api.add_server('Мой сервер (' + ver + ')', '127.0.0.1', 25565);
+    if (srvRes.ok) renderServers(srvRes.servers);
+  }
+
+  async function joinOwnServer() {
+    // Хозяин сам — сервер у него локальный, поэтому подключение всегда
+    // через localhost, без внешнего IP/порта и копирования чего-либо.
+    // Версия клиента должна совпадать с версией сервера, иначе игра не
+    // зайдёт ("Outdated client/server") — берём её из выбора в карточке
+    // хостинга и форсируем vanilla (серверный jar всегда vanilla).
+    const srvVer = $('srvVersion').value;
+    if (srvVer) {
+      const opt = Array.from($('version').options).find(o => o.value === srvVer);
+      if (opt) $('version').value = srvVer;
+    }
+    $('loader').value = 'vanilla';
+    await play('127.0.0.1', 25565);
   }
 
   async function stopHosting() {

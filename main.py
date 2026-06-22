@@ -7,6 +7,7 @@ import os
 import webview
 
 from backend.api import Api
+from backend import server_manager
 
 HERE = os.path.dirname(__file__)
 UI_FILE = os.path.join(HERE, "ui", "index.html")
@@ -27,7 +28,13 @@ def main() -> None:
     api.window = window
 
     def on_closing():
-        """При закрытии окна уходим оффлайн в MQTT."""
+        """При закрытии окна уходим оффлайн в MQTT и гарантированно глушим
+        сервер — иначе java-процесс остаётся осиротевшим и блокирует папку
+        мира при следующем запуске лаунчера."""
+        try:
+            server_manager.shutdown_blocking()
+        except Exception:
+            pass
         try:
             api.clear_own_presence()
         except Exception:

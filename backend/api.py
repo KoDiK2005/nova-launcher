@@ -34,6 +34,7 @@ DEFAULTS = {
     "server_ram":     1024,
     "p2p_priv":       "",
     "p2p_pub":        "",
+    "server_settings": dict(server_manager.DEFAULT_SERVER_SETTINGS),
 }
 
 
@@ -41,9 +42,11 @@ def _load_config() -> dict:
     try:
         with open(CONFIG_PATH, encoding="utf-8") as f:
             d = json.load(f)
-        return {k: d.get(k, v) for k, v in DEFAULTS.items()}
+        cfg = {k: d.get(k, v) for k, v in DEFAULTS.items()}
     except (FileNotFoundError, json.JSONDecodeError):
-        return dict(DEFAULTS)
+        cfg = dict(DEFAULTS)
+    cfg["server_settings"] = server_manager.normalize_settings(cfg.get("server_settings"))
+    return cfg
 
 
 def _save_config(data: dict):
@@ -176,6 +179,7 @@ class Api:
             "saved_jvm_extra": cfg["jvm_extra"],
             "saved_srv_ver":   cfg["server_version"],
             "saved_srv_ram":   cfg["server_ram"],
+            "saved_srv_settings": cfg["server_settings"],
             "ms_account":      auth["name"] if auth else None,
         }
 
@@ -204,7 +208,12 @@ class Api:
 
     def add_server(self, name: str, ip: str, port: int = 25565):
         cfg = _load_config()
-        cfg["servers"].append({"name": name, "ip": ip, "port": port})
+        port = int(port)
+        existing = next((s for s in cfg["servers"] if s["ip"] == ip and int(s["port"]) == port), None)
+        if existing:
+            existing["name"] = name  # обновляем имя (напр. версия сервера поменялась)
+        else:
+            cfg["servers"].append({"name": name, "ip": ip, "port": port})
         _save_config(cfg)
         minecraft.sync_servers_dat(cfg["servers"])
         return {"ok": True, "servers": cfg["servers"]}
@@ -388,11 +397,20 @@ class Api:
         return {"ip": server_manager.get_local_ip()}
 
     def get_server_status(self):
-        return {"running": server_manager.is_running()}
+        return {"running": server_manager.is_running(), "starting": server_manager.is_starting()}
 
-    def start_server(self, version_id: str, ram: int = 1024):
+    def get_server_settings(self):
+        return {"settings": _load_config()["server_settings"]}
+
+    def save_server_settings(self, settings: dict):
+        normalized = server_manager.normalize_settings(settings)
+        _save_config({"server_settings": normalized})
+        return {"ok": True, "settings": normalized}
+
+    def start_server(self, version_id: str, ram: int = 1024, settings: dict | None = None):
         cfg = _load_config()
-        _save_config({"server_version": version_id, "server_ram": int(ram)})
+        settings = server_manager.normalize_settings(settings or cfg["server_settings"])
+        _save_config({"server_version": version_id, "server_ram": int(ram), "server_settings": settings})
 
         def on_log(line):
             self._emit("onServerLog", line)
@@ -420,7 +438,8 @@ class Api:
 
         server_manager.start(
             version_id, int(ram), cfg["java_path"],
-            on_log, on_started, on_stopped, on_error
+            on_log, on_started, on_stopped, on_error,
+            settings=settings,
         )
         return {"ok": True}
 
