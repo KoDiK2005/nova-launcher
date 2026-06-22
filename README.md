@@ -41,7 +41,39 @@
 - Python 3.12+
 - Java 17+ в PATH (`java -version`)
 
-## Установка
+## Быстрый тест без установки Python (exe)
+
+Чтобы дать кому-то просто потестировать лаунчер без установки Python и зависимостей:
+
+1. Собери архив (см. [Сборка exe](#сборка-exe-для-раздачи) ниже) или возьми готовый
+   `dist/NOVA_Launcher_build.zip`.
+2. Отправь архив тестеру (например через Google Drive/Telegram — GitHub Releases
+   для бинарников обычно удобнее, см. ниже).
+3. Тестер распаковывает архив в любую папку и запускает `NOVA Launcher.exe`.
+4. Требования у тестера: Windows 10/11 + установленный Java (любой 17+, можно
+   скачать с [adoptium.net](https://adoptium.net)) + WebView2 Runtime (уже стоит
+   почти у всех — Windows 11 включает по умолчанию; если лаунчер не открывается,
+   ставится отсюда: https://go.microsoft.com/fwlink/p/?LinkId=2124703).
+5. Никакой установки/регистрации не требуется — это portable-сборка
+   (`--onedir`), всё лежит в одной папке.
+
+### Сборка exe для раздачи
+
+```powershell
+.venv\Scripts\activate
+pip install pyinstaller
+build.bat
+```
+
+Результат: `dist\NOVA Launcher\` (папка) и `dist\NOVA_Launcher_build.zip` (архив
+для раздачи — тестеру нужен только zip, остальное лауnчер соберёт сам при первом
+запуске: версии Minecraft, ассеты и т.д. скачиваются в `game_data/` рядом с exe).
+
+Если позже захочешь раздавать через GitHub: `gh release create v0.1.0
+dist/NOVA_Launcher_build.zip --title "NOVA Launcher v0.1.0"` — тогда у тестеров
+будет прямая ссылка для скачивания без шаринга файлов вручную.
+
+## Установка из исходников (для разработки)
 
 ```powershell
 git clone https://github.com/KoDiK2005/nova-launcher.git
@@ -50,6 +82,13 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
+```
+
+## Тесты
+
+```powershell
+.venv\Scripts\activate
+python -m unittest discover -s tests
 ```
 
 ## Стек
@@ -117,6 +156,12 @@ launcher/
 
 Если P2P недоступен (оба за Symmetric NAT и relay не настроен) — можно по-старому
 открыть порт через **UPnP** в настройках хоста и передать другу IP вручную.
+
+> Сервер не всегда автоматически появляется в списке "Сетевая игра" самого
+> Minecraft (нативный формат `servers.dat` у игры капризный). На этот случай
+> в карточке хостинга и в блоке "Локальная сеть" есть кнопка
+> **📋 Скопировать IP:порт** — вставляешь скопированное в Minecraft через
+> "Сетевая игра → Добавить сервер" или "Прямое подключение".
 
 ## Лицензия
 
