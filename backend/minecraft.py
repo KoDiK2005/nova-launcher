@@ -2,8 +2,10 @@
 minecraft.py — логика работы с игрой.
 """
 
+import gzip
 import hashlib
 import os
+import struct
 import subprocess
 import uuid
 
@@ -12,7 +14,7 @@ import minecraft_launcher_lib as mll
 GAME_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "game_data")
 
 
-# ─── Версии ───────────────────────────────────────────────────────────────────
+# --- Версии -------------------------------------------------------------------
 
 def get_versions() -> list[dict]:
     try:
@@ -31,7 +33,7 @@ def install_version(version_id: str, callback: dict | None = None) -> None:
     mll.install.install_minecraft_version(version_id, GAME_DIR, callback=callback or {})
 
 
-# ─── Fabric ───────────────────────────────────────────────────────────────────
+# --- Fabric -------------------------------------------------------------------
 
 def get_fabric_loader_version() -> str:
     loaders = mll.fabric.get_all_loader_versions()
@@ -55,7 +57,7 @@ def install_fabric(mc_version: str, callback: dict | None = None) -> str:
     return fabric_version_id(mc_version)
 
 
-# ─── Папка модов ──────────────────────────────────────────────────────────────
+# --- Папка модов --------------------------------------------------------------
 
 def get_mods_dir() -> str:
     path = os.path.join(GAME_DIR, "mods")
@@ -67,7 +69,48 @@ def open_mods_folder() -> None:
     os.startfile(get_mods_dir())
 
 
-# ─── Запуск ───────────────────────────────────────────────────────────────────
+# --- servers.dat (синхронизация с Minecraft) ----------------------------------
+
+def _nbt_str(s: str) -> bytes:
+    enc = s.encode("utf-8")
+    return struct.pack(">H", len(enc)) + enc
+
+
+def sync_servers_dat(servers: list) -> None:
+    """Записывает список серверов в game_data/servers.dat — они появятся
+    в мультиплеере прямо в игре."""
+    entries = []
+    for srv in servers:
+        ip = srv["ip"]
+        if int(srv.get("port", 25565)) != 25565:
+            ip = f"{ip}:{srv['port']}"
+        name = srv.get("name", ip)
+
+        payload = b""
+        payload += bytes([8]) + _nbt_str("ip")   + _nbt_str(ip)
+        payload += bytes([8]) + _nbt_str("name") + _nbt_str(name)
+        payload += b"\x00"  # TAG_End
+        entries.append(payload)
+
+    # TAG_List (9) named "servers" of TAG_Compound (10)
+    list_payload  = bytes([10])
+    list_payload += struct.pack(">i", len(entries))
+    for e in entries:
+        list_payload += e
+
+    # Root TAG_Compound contents
+    root  = bytes([9]) + _nbt_str("servers") + list_payload
+    root += b"\x00"  # TAG_End
+
+    # Полный NBT: TAG_Compound (10) с пустым именем
+    nbt = bytes([10]) + _nbt_str("") + root
+
+    os.makedirs(GAME_DIR, exist_ok=True)
+    with gzip.open(os.path.join(GAME_DIR, "servers.dat"), "wb") as f:
+        f.write(nbt)
+
+
+# --- Запуск -------------------------------------------------------------------
 
 def _offline_uuid(username: str) -> str:
     data = hashlib.md5(f"OfflinePlayer:{username}".encode()).digest()
