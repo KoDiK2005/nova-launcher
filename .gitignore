@@ -16,4 +16,6 @@ game_data/
 *.log
 config.json
 versions_cache.json
+auth.json
+auth.json.tmp
 HANDOFF.md

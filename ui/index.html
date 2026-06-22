@@ -365,6 +365,37 @@
     font-size: 22px; font-weight: 700; color: var(--green);
   }
   .info-card-sub { font-size: 12px; color: var(--muted); }
+
+  /* mode toggle */
+  .mode-toggle {
+    display: flex; gap: 4px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+    width: fit-content;
+  }
+  .mode-btn {
+    padding: 5px 14px; border: none; border-radius: 7px;
+    background: transparent; color: var(--muted);
+    font-family: 'Chakra Petch', sans-serif; font-size: 12px;
+    letter-spacing: 0.1em; cursor: pointer; transition: all .12s;
+  }
+  .mode-btn.active { background: rgba(47,245,168,0.15); color: var(--green); }
+  .mode-btn:hover:not(.active) { color: var(--text); }
+
+  /* microsoft login btn */
+  .ms-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: background .12s;
+  }
+  .ms-btn:hover { background: rgba(255,255,255,0.10); }
+  .ms-btn.logged { border-color: rgba(47,245,168,0.3); color: var(--green); }
 </style>
 </head>
 <body>
@@ -445,11 +476,30 @@
 
           <div class="play-details">
             <div class="play-meta">
-              <div class="nick-wrap">
+              <!-- ник / MS аккаунт -->
+              <div class="nick-wrap" id="offlineBlock">
                 <span class="nick-label">НИК</span>
                 <input class="nick-input" id="username" type="text" value="Mark" maxlength="16" placeholder="Mark" autocomplete="off">
               </div>
+              <div class="ms-block" id="msBlock" style="display:none">
+                <button class="ms-btn" id="msLoginBtn" onclick="msLogin()">
+                  <svg width="16" height="16" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                  <span id="msLabel">Войти через Microsoft</span>
+                </button>
+              </div>
+              <!-- версия -->
               <select id="version"><option>...</option></select>
+              <!-- лоадер -->
+              <select id="loader" title="Mod loader">
+                <option value="vanilla">Vanilla</option>
+                <option value="fabric">Fabric</option>
+              </select>
+            </div>
+
+            <!-- переключатель offline/microsoft -->
+            <div class="mode-toggle">
+              <button class="mode-btn active" id="btnOffline" onclick="setMode('offline')">Offline</button>
+              <button class="mode-btn" id="btnMs" onclick="setMode('ms')">Microsoft</button>
             </div>
 
             <div class="bar-wrap" id="barWrap">
@@ -486,8 +536,10 @@
 <script>
   const $ = id => document.getElementById(id);
   let maxProgress = 0;
+  let currentMode = 'offline'; // 'offline' | 'ms'
+  let msUsername  = null;
 
-  // пиксели-декор в углу hero
+  // пиксели-декор
   (function() {
     const colors = ['#2ff5a8','#15d8c4','#7e62ff','#22d3ee','#34f5a0',
                     'transparent','transparent','transparent','transparent'];
@@ -500,28 +552,57 @@
     }
   })();
 
-  // ник синхронизируем в sidebar
   $('username').addEventListener('input', () => {
     $('sideNick').textContent = $('username').value || 'Mark';
   });
-
-  // поиск фильтрует версии
   $('searchInput').addEventListener('input', function() {
     const q = this.value.toLowerCase();
     Array.from($('version').options).forEach(o => {
       o.hidden = q && !o.value.toLowerCase().includes(q);
     });
   });
-
-  // версия в карточке
   $('version').addEventListener('change', () => {
     $('cardVersion').textContent = $('version').value || '—';
   });
 
-  // --- колбэки от Python ---
+  // --- режим offline/Microsoft ---
+  function setMode(mode) {
+    currentMode = mode;
+    $('btnOffline').classList.toggle('active', mode === 'offline');
+    $('btnMs').classList.toggle('active', mode === 'ms');
+    $('offlineBlock').style.display = mode === 'offline' ? '' : 'none';
+    $('msBlock').style.display      = mode === 'ms'      ? '' : 'none';
+  }
+
+  // --- Microsoft auth ---
+  async function msLogin() {
+    if (msUsername) {
+      // уже вошли — выход
+      await window.pywebview.api.logout();
+      msUsername = null;
+      $('msLabel').textContent = 'Войти через Microsoft';
+      $('msLoginBtn').classList.remove('logged');
+      $('sideNick').textContent = $('username').value || 'Mark';
+      return;
+    }
+    setStatus('Открываю окно входа Microsoft...', '');
+    await window.pywebview.api.start_ms_login();
+  }
+
+  function onMsLoggedIn(username, uuid) {
+    msUsername = username;
+    $('msLabel').textContent = username + ' (выйти)';
+    $('msLoginBtn').classList.add('logged');
+    $('sideNick').textContent = username;
+    setStatus('Вошёл как ' + username, 'ok');
+  }
+  function onMsError(msg) {
+    setStatus('Ошибка входа: ' + msg, 'err');
+  }
+
+  // --- колбэки игры ---
   function onStatus(text) {
-    setStatus(text);
-    showBar(true);
+    setStatus(text); showBar(true);
     $('cardStatus').textContent = 'DOWNLOADING';
     $('cardStatus').style.color = 'var(--green)';
     $('cardSub').textContent = text;
@@ -564,20 +645,23 @@
   }
 
   async function play() {
-    const username = $('username').value.trim();
     const version  = $('version').value;
-    if (!username) { setStatus('Введи ник', 'err'); return; }
+    const loader   = $('loader').value;
+    const use_ms   = currentMode === 'ms';
+    const username = use_ms ? (msUsername || '') : $('username').value.trim();
+
+    if (!use_ms && !username) { setStatus('Введи ник', 'err'); return; }
+    if (use_ms && !msUsername) { setStatus('Сначала войди через Microsoft', 'err'); return; }
 
     const b = $('playBtn');
-    b.disabled = true;
-    b.innerHTML = '...';
+    b.disabled = true; b.innerHTML = '...';
     setStatus(''); showBar(false);
     $('barFill').style.width = '0%';
     $('cardStatus').textContent = 'STARTING';
     $('cardStatus').style.color = 'var(--muted2)';
 
     try {
-      const res = await window.pywebview.api.play(version, username);
+      const res = await window.pywebview.api.play(version, username, loader, use_ms);
       if (!res.ok) onError(res.error || 'не удалось запустить');
     } catch(e) { onError(String(e)); }
   }
@@ -593,15 +677,21 @@
         sel.appendChild(o);
       });
 
-      // восстанавливаем сохранённый ник
       if (data.saved_username) {
         $('username').value = data.saved_username;
         $('sideNick').textContent = data.saved_username;
       }
-      // восстанавливаем сохранённую версию
       if (data.saved_version) {
         const opt = Array.from(sel.options).find(o => o.value === data.saved_version);
         if (opt) sel.value = data.saved_version;
+      }
+      if (data.saved_loader) $('loader').value = data.saved_loader;
+
+      // восстанавливаем MS аккаунт если был
+      if (data.ms_account) {
+        msUsername = data.ms_account;
+        $('msLabel').textContent = data.ms_account + ' (выйти)';
+        $('msLoginBtn').classList.add('logged');
       }
 
       $('cardVersion').textContent = sel.value;
